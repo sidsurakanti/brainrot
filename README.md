@@ -2,7 +2,7 @@
 // brain.rot
 a = 1 * 2 + 3;
 ```
-```bash
+```rust
 [
     Token {
         kind: Identifier(
