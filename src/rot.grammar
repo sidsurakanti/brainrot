@@ -1,0 +1,24 @@
+program -> statement* EOF
+
+statement -> block | letStmt | ifStmt | whileStmt | forStmt | fnDecl | exprStmt
+
+block -> "{" statement* "}"
+letStmt -> "let" IDENT "=" expr ";"
+ifStmt -> "if" "(" expr ")" statement "else" statement
+whileStmt -> "while" "(" expr ")" statement
+forStmt -> "for" "(" letStmt expr ";" expr ")" statement
+fnDecl -> "fn" IDENT "(" params? ")" block
+exprStmt -> expr ";"
+
+expr -> equality
+equality -> comparison (("!=" | "==") comparison)*
+comparison -> term ((">" | "<" | ">=" | "<=") term)*
+term -> factor ("+" | "-") factor
+term -> unary ("*" | "/") unary
+unary -> "-" unary | "!" unary | primary
+primary -> IDENT | NUMBER | STRING | "(" expr ")"
+
+params -> IDENT ("," IDENT)*
+
+
+
