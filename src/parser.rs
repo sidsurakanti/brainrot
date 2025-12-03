@@ -2,14 +2,6 @@ use crate::token::{Token, TokenType};
 use maplit::hashmap;
 use std::collections::HashMap;
 
-// lexer.tokenize() -> Vec<Token> ->
-pub struct Parser {
-    tokens: Vec<Token>,
-    pos: usize,
-    ast: Vec<Stmt>,
-    lookup: HashMap<TokenType, (usize, usize)>,
-}
-
 #[derive(Debug)]
 pub enum Stmt {
     Block(Vec<Stmt>),
@@ -21,7 +13,7 @@ pub enum Stmt {
 }
 
 #[derive(Debug)]
-enum Expr {
+pub enum Expr {
     Binary(Box<Expr>, TokenType, Box<Expr>),
     Unary(TokenType, Box<Expr>),
     Number(i32),
@@ -30,12 +22,18 @@ enum Expr {
     Group(Box<Expr>),
 }
 
+// lexer.tokenize() -> Vec<Token> ->
+pub struct Parser {
+    tokens: Vec<Token>,
+    pos: usize,
+    lookup: HashMap<TokenType, (usize, usize)>,
+}
+
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
         Self {
             tokens,
             pos: 0,
-            ast: vec![],
             lookup: hashmap! {
                 TokenType::Plus => (10, 11),
                 TokenType::Minus => (10, 11),
@@ -67,13 +65,9 @@ impl Parser {
         Ok(statements)
     }
 
-    // parse statement
-    // if token is { parse block
-    // if token is let parse let
-    // while -> parse while loop
-    // for -> parse for loop
-    // fn -> parse function
-    // expr -> parse expression (pratt)
+    // NOTE:
+    // we know a program essentially only contains statements + an EOF
+    // so, all we have to do is parse all the statements in the prog
     pub fn parse_statement(&mut self) -> Result<Stmt, String> {
         let token = self.peek();
 
@@ -85,6 +79,7 @@ impl Parser {
             // TokenType::Fn => self.parse_fn()?,
             _ => {
                 let expr = self.parse_expr()?;
+                self.expect(TokenType::Semicolon, "expected ';' after expression");
                 Stmt::Expr(expr)
             }
         };
@@ -92,51 +87,54 @@ impl Parser {
         Ok(statement)
     }
 
+    // block -> "{" statement* "}"
     fn parse_block(&mut self) -> Result<Stmt, String> {
         let mut statements = vec![];
 
-        self.next(); // consume LBrace
+        // consume LBrace
+        self.expect(TokenType::LBrace, "expected '{'");
 
         while !self.check(TokenType::RBrace) {
             statements.push(self.parse_statement()?);
         }
 
-        self.next(); // consume }
+        // consume RBrace
+        self.expect(TokenType::RBrace, "expected '}'");
 
         Ok(Stmt::Block(statements))
     }
 
+    // letStmt -> "let" IDENT "=" expr ";"
     fn parse_let(&mut self) -> Result<Stmt, String> {
-        // letStmt -> "let" IDENT "=" expr ";"
         // consume let
-        self.next();
+        self.expect(TokenType::Let, "expected 'let'");
 
         let name = match self.next().kind {
             TokenType::Identifier(s) => s,
             _ => return Err("expected identifier after let".into()),
         };
 
-        if !self.check(TokenType::Assign) {
-            return Err("expected '=' after identifier".into());
-        }
-        self.next();
+        self.expect(TokenType::Assign, "expected assignment after identifier");
 
         let expr = self.parse_expr()?;
 
-        if !self.check(TokenType::Semicolon) {
-            return Err("expected ';' after statement".into());
-        }
-        self.next();
+        self.expect(
+            TokenType::Semicolon,
+            "expected semicolon after end condition",
+        );
 
         Ok(Stmt::Let(name, expr))
     }
 
     // whileStmt -> "while" "(" expr ")" statement
     fn parse_while(&mut self) -> Result<Stmt, String> {
-        self.next(); // consume while
+        // consume while
+        self.expect(TokenType::While, "expected 'while'");
 
+        self.expect(TokenType::LParen, "expected '(' after while");
         let cond: Expr = self.parse_expr()?;
         let block: Stmt = self.parse_block()?;
+        self.expect(TokenType::RParen, "expected ')' after condition");
 
         Ok(Stmt::While(cond, Box::new(block)))
     }
@@ -145,17 +143,14 @@ impl Parser {
     fn parse_for(&mut self) -> Result<Stmt, String> {
         self.next(); // consume for
 
+        self.expect(TokenType::LParen, "expected '(' after for");
+
         let init: Stmt = self.parse_let()?;
         let cond: Expr = self.parse_expr()?;
-
-        self.expect(
-            TokenType::Semicolon,
-            "expected semicolon after end condition",
-        );
-
+        self.expect(TokenType::Semicolon, "expected ';' after end condition");
         let step: Expr = self.parse_expr()?;
 
-        self.expect(TokenType::LBrace, "expected block after condition");
+        self.expect(TokenType::RParen, "expected ')' after condition");
 
         let block: Stmt = self.parse_block()?;
 
@@ -170,34 +165,37 @@ impl Parser {
         Ok(expr)
     }
 
-    fn bp(&self, op: &TokenType) -> (usize, usize) {
-        self.lookup.get(&op).copied().unwrap()
-    }
-
-    fn is_infix(&self, op: &TokenType) -> bool {
-        self.lookup.contains_key(op)
-    }
-
     fn pratt(&mut self, min_bp: usize) -> Expr {
+        // NOTE:
         // if first token starts with a prefix op (! or - or '(') >
-        //  turn into unary or parse group expr
+        //     turn into unary or parse group expr
         // else return js the literal
-        //
+
         // *a
-        // if next tok is an infix op consume op else break and return expr
+        //
+        // if (next tok is an infix op) consume op > else break and return expr
         // parse left side w bp of op
-        // if bp of next op < curr stop and then make this lhs
+        // if (bp of next op < curr) stop and then make this lhs
+        // ^ say 6 * 6 + 5 -> we need (6 * 6) + 5 and not 6 * (6 + 5)
+        // else loop back to *a
         //
         // start again from point a
 
-        let first = self.next();
-        let mut lhs = self.nud(first);
+        let start: Token = self.next();
+        println!("{:?}", start);
+
+        let mut lhs = self.nud(start);
+        println!("{:?}", lhs);
 
         loop {
+            // lhs <op>, else ignore curr token and break
+            // we let parent's handle other tokens
             let op = match self.peek().kind.clone() {
                 k if self.is_infix(&k) => k,
                 _ => break,
             };
+
+            // println!("{:?} {}", op, min_bp);
 
             let (lbp, rbp) = self.bp(&op);
             if min_bp > lbp {
@@ -207,10 +205,19 @@ impl Parser {
             self.next(); // consume op
 
             let rhs = self.pratt(rbp);
-            lhs = Expr::Binary(Box::new(lhs), op, Box::new(rhs));
+
+            lhs = Expr::Binary(Box::new(lhs), op, Box::new(rhs))
         }
 
         lhs
+    }
+
+    fn bp(&self, op: &TokenType) -> (usize, usize) {
+        self.lookup.get(&op).copied().unwrap()
+    }
+
+    fn is_infix(&self, op: &TokenType) -> bool {
+        self.lookup.contains_key(op)
     }
 
     fn nud(&mut self, token: Token) -> Expr {
@@ -230,16 +237,15 @@ impl Parser {
             }
 
             TokenType::LParen => {
-                let expr = self.pratt(0);
+                let rhs = self.pratt(0);
                 self.expect(TokenType::RParen, "expected ')' after expression");
-                Expr::Group(Box::new(expr))
+                Expr::Group(Box::new(rhs))
             }
 
             other => panic!("unexpected token in nud: {:?}", other),
         }
     }
 
-    // why did i make this lol
     fn check(&mut self, kind: TokenType) -> bool {
         if self.pos >= self.tokens.len() {
             return false;
@@ -254,7 +260,7 @@ impl Parser {
 
     fn expect(&mut self, kind: TokenType, msg: &str) {
         if self.peek().kind != kind {
-            panic!("{}", msg);
+            panic!("{} at {:#?}", msg, self.peek().span);
         }
 
         self.next();
