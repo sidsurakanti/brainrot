@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum TokenType {
     // literals
     Number(i32),
@@ -54,8 +54,29 @@ pub enum TokenType {
     EOF,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Token {
     pub kind: TokenType,
     pub span: Range<usize>,
+}
+
+impl Token {
+    pub fn is_op(&self) -> bool {
+        match self.kind {
+            TokenType::Plus
+            | TokenType::Minus
+            | TokenType::Times
+            | TokenType::Divide
+            | TokenType::Modulo
+            | TokenType::Assign
+            | TokenType::Bang
+            | TokenType::Less
+            | TokenType::Greater
+            | TokenType::EqualEqual
+            | TokenType::NotEqual
+            | TokenType::LessEqual
+            | TokenType::GreaterEqual => true,
+            _ => false,
+        }
+    }
 }
