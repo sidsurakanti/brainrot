@@ -10,6 +10,7 @@ pub enum Stmt {
     For(Box<Stmt>, Expr, Expr, Box<Stmt>),
     Fn(String, Vec<String>, Box<Stmt>),
     Expr(Expr),
+    Call(String, Vec<String>),
 }
 
 #[derive(Debug)]
@@ -77,6 +78,18 @@ impl Parser {
             TokenType::While => self.parse_while()?,
             TokenType::For => self.parse_for()?,
             // TokenType::Fn => self.parse_fn()?,
+            TokenType::Identifier if self.at(1).kind != TokenType::LParen => {
+                let expr = self.parse_expr()?;
+                self.expect(TokenType::Semicolon, "expected ';' after expression");
+                Stmt::Expr(expr)
+            }
+            TokenType::Identifier => {
+                let name = token.lexeme.clone();
+                self.next(); // consume ident
+                let args: Vec<String> = self.parse_args()?;
+                self.expect(TokenType::Semicolon, "expected ';' after expression");
+                Stmt::Call(name, args)
+            }
             _ => {
                 let expr = self.parse_expr()?;
                 self.expect(TokenType::Semicolon, "expected ';' after expression");
@@ -104,15 +117,34 @@ impl Parser {
         Ok(Stmt::Block(statements))
     }
 
+    // params -> IDENT ("," IDENT)*
+    fn parse_args(&mut self) -> Result<Vec<String>, String> {
+        self.expect(TokenType::LParen, "expected '(' after function");
+        let mut args: Vec<String> = vec![];
+
+        if matches!(self.peek().kind, TokenType::Identifier) {
+            // push curr ident
+            let arg = self.expect(TokenType::Identifier, "expected arg");
+            args.push(arg.lexeme);
+
+            while self.peek().kind == TokenType::Comma {
+                self.expect(TokenType::Comma, "expected comma after arg");
+                let arg = self.expect(TokenType::Identifier, "expected arg");
+                args.push(arg.lexeme);
+            }
+        }
+
+        self.expect(TokenType::RParen, "expected ')' after function call");
+        Ok(args)
+    }
+
     // letStmt -> "let" IDENT "=" expr ";"
     fn parse_let(&mut self) -> Result<Stmt, String> {
         // consume let
         self.expect(TokenType::Let, "expected 'let'");
 
-        let name = match self.next().kind {
-            TokenType::Identifier(s) => s,
-            _ => return Err("expected identifier after let".into()),
-        };
+        let ident = self.expect(TokenType::Identifier, "expected identifier after let");
+        let name = ident.lexeme;
 
         self.expect(TokenType::Assign, "expected assignment after identifier");
 
@@ -133,21 +165,23 @@ impl Parser {
 
         self.expect(TokenType::LParen, "expected '(' after while");
         let cond: Expr = self.parse_expr()?;
-        let block: Stmt = self.parse_block()?;
         self.expect(TokenType::RParen, "expected ')' after condition");
+        let block: Stmt = self.parse_block()?;
 
         Ok(Stmt::While(cond, Box::new(block)))
     }
 
     // forStmt -> "for" "(" letStmt expr ";" expr ")" statement
     fn parse_for(&mut self) -> Result<Stmt, String> {
-        self.next(); // consume for
+        self.expect(TokenType::For, "expected 'for'");
 
         self.expect(TokenType::LParen, "expected '(' after for");
 
         let init: Stmt = self.parse_let()?;
+
         let cond: Expr = self.parse_expr()?;
         self.expect(TokenType::Semicolon, "expected ';' after end condition");
+
         let step: Expr = self.parse_expr()?;
 
         self.expect(TokenType::RParen, "expected ')' after condition");
@@ -166,26 +200,12 @@ impl Parser {
     }
 
     fn pratt(&mut self, min_bp: usize) -> Expr {
-        // NOTE:
-        // if first token starts with a prefix op (! or - or '(') >
-        //     turn into unary or parse group expr
-        // else return js the literal
-
-        // *a
-        //
-        // if (next tok is an infix op) consume op > else break and return expr
-        // parse left side w bp of op
-        // if (bp of next op < curr) stop and then make this lhs
-        // ^ say 6 * 6 + 5 -> we need (6 * 6) + 5 and not 6 * (6 + 5)
-        // else loop back to *a
-        //
-        // start again from point a
-
+        // 6 * 2 + 3 / (3 + 2) -> (6 * 2) + (3 / (3 + 2))
         let start: Token = self.next();
-        println!("{:?}", start);
+        // println!("{:?}", start);
 
         let mut lhs = self.nud(start);
-        println!("{:?}", lhs);
+        // println!("{:?}", lhs);
 
         loop {
             // lhs <op>, else ignore curr token and break
@@ -222,9 +242,9 @@ impl Parser {
 
     fn nud(&mut self, token: Token) -> Expr {
         match token.kind {
-            TokenType::Number(n) => Expr::Number(n),
-            TokenType::String(s) => Expr::String(s),
-            TokenType::Identifier(name) => Expr::Ident(name),
+            TokenType::Number => Expr::Number(token.lexeme.parse().unwrap()),
+            TokenType::String => Expr::String(token.lexeme),
+            TokenType::Identifier => Expr::Ident(token.lexeme),
 
             TokenType::Minus => {
                 let rhs = self.pratt(30);
@@ -251,23 +271,23 @@ impl Parser {
             return false;
         }
 
-        if self.peek().kind == kind {
-            return true;
-        }
-
-        false
+        std::mem::discriminant(&self.peek().kind) == std::mem::discriminant(&kind)
     }
 
-    fn expect(&mut self, kind: TokenType, msg: &str) {
-        if self.peek().kind != kind {
+    fn expect(&mut self, kind: TokenType, msg: &str) -> Token {
+        if !self.check(kind) {
             panic!("{} at {:#?}", msg, self.peek().span);
         }
 
-        self.next();
+        self.next()
     }
 
     fn peek(&self) -> &Token {
         &self.tokens[self.pos]
+    }
+
+    fn at(&self, offset: usize) -> &Token {
+        &self.tokens[self.pos + offset]
     }
 
     fn next(&mut self) -> Token {

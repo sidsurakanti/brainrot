@@ -3,9 +3,9 @@ use std::ops::Range;
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum TokenType {
     // literals
-    Number(i32),
-    Identifier(String),
-    String(String),
+    Number,
+    Identifier,
+    String,
 
     // operators
     Assign,
@@ -58,6 +58,7 @@ pub enum TokenType {
 pub struct Token {
     pub kind: TokenType,
     pub span: Range<usize>,
+    pub lexeme: String,
 }
 
 impl Token {

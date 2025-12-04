@@ -35,7 +35,7 @@ impl Lexer {
 
             let ch = match self.peek() {
                 Some(ch) => ch,
-                None => return self.make_token(TokenType::EOF, start, self.pos),
+                None => return self.make_token(TokenType::EOF, "EOF".into(), start, self.pos),
             };
 
             // match the big ones first
@@ -59,112 +59,58 @@ impl Lexer {
                 return self.bag_identifer_or_keyword();
             }
 
-            // match single chars now
-            match ch {
-                '(' => {
-                    self.next();
-                    return self.make_token(TokenType::LParen, start, self.pos);
-                }
-                ')' => {
-                    self.next();
-                    return self.make_token(TokenType::RParen, start, self.pos);
-                }
-                '{' => {
-                    self.next();
-                    return self.make_token(TokenType::LBrace, start, self.pos);
-                }
-                '}' => {
-                    self.next();
-                    return self.make_token(TokenType::RBrace, start, self.pos);
-                }
-                ',' => {
-                    self.next();
-                    return self.make_token(TokenType::Comma, start, self.pos);
-                }
-                ';' => {
-                    self.next();
-                    return self.make_token(TokenType::Semicolon, start, self.pos);
-                }
-                ':' => {
-                    self.next();
-                    return self.make_token(TokenType::Colon, start, self.pos);
-                }
-                '.' => {
-                    self.next();
-                    return self.make_token(TokenType::Dot, start, self.pos);
-                }
-                '+' => {
-                    self.next();
-                    return self.make_token(TokenType::Plus, start, self.pos);
-                }
-                '-' => {
-                    self.next();
-                    return self.make_token(TokenType::Minus, start, self.pos);
-                }
-                '*' => {
-                    self.next();
-                    return self.make_token(TokenType::Times, start, self.pos);
-                }
-                '/' => {
-                    self.next();
-                    return self.make_token(TokenType::Divide, start, self.pos);
-                }
-                '%' => {
-                    self.next();
-                    return self.make_token(TokenType::Modulo, start, self.pos);
-                }
-                '!' => {
-                    self.next();
-                    return self.make_token(TokenType::Bang, start, self.pos);
-                }
-                _ => {}
+            let nc = self.peek_n(1);
+
+            if let Some(kind) = self.try_two_char(ch) {
+                self.next();
+                self.next();
+                return self.make_token(
+                    kind,
+                    [ch, nc.unwrap_or('\0')].iter().collect(),
+                    start,
+                    self.pos,
+                );
             }
 
-            match (ch, self.peek_n(1)) {
-                ('=', Some('=')) => {
-                    self.next();
-                    self.next();
-                    return self.make_token(TokenType::EqualEqual, start, self.pos);
-                }
-                ('!', Some('=')) => {
-                    self.next();
-                    self.next();
-                    return self.make_token(TokenType::NotEqual, start, self.pos);
-                }
-                ('<', Some('=')) => {
-                    self.next();
-                    self.next();
-                    return self.make_token(TokenType::LessEqual, start, self.pos);
-                }
-                ('>', Some('=')) => {
-                    self.next();
-                    self.next();
-                    return self.make_token(TokenType::GreaterEqual, start, self.pos);
-                }
-                ('<', _) => {
-                    self.next();
-                    return self.make_token(TokenType::Less, start, self.pos);
-                }
-                ('>', _) => {
-                    self.next();
-                    return self.make_token(TokenType::Greater, start, self.pos);
-                }
-                ('&', Some('&')) => {
-                    self.next();
-                    self.next();
-                    return self.make_token(TokenType::And, start, self.pos);
-                }
-                ('|', Some('|')) => {
-                    self.next();
-                    self.next();
-                    return self.make_token(TokenType::Or, start, self.pos);
-                }
-                ('=', _) => {
-                    self.next();
-                    return self.make_token(TokenType::Assign, start, self.pos);
-                }
-                _ => {}
+            if let Some(kind) = self.single_char_tok(ch) {
+                self.next();
+                return self.make_token(kind, ch.to_string(), start, self.pos);
             }
+        }
+    }
+
+    fn try_two_char(&mut self, ch: char) -> Option<TokenType> {
+        match (ch, self.peek_n(1)) {
+            ('<', Some('=')) => Some(TokenType::LessEqual),
+            ('>', Some('=')) => Some(TokenType::GreaterEqual),
+            ('=', Some('=')) => Some(TokenType::EqualEqual),
+            ('!', Some('=')) => Some(TokenType::NotEqual),
+            ('&', Some('&')) => Some(TokenType::And),
+            ('|', Some('|')) => Some(TokenType::Or),
+            _ => None,
+        }
+    }
+
+    fn single_char_tok(&mut self, ch: char) -> Option<TokenType> {
+        match ch {
+            '(' => Some(TokenType::LParen),
+            ')' => Some(TokenType::RParen),
+            '{' => Some(TokenType::LBrace),
+            '}' => Some(TokenType::RBrace),
+            ',' => Some(TokenType::Comma),
+            ';' => Some(TokenType::Semicolon),
+            ':' => Some(TokenType::Colon),
+            '.' => Some(TokenType::Dot),
+            '+' => Some(TokenType::Plus),
+            '-' => Some(TokenType::Minus),
+            '*' => Some(TokenType::Times),
+            '/' => Some(TokenType::Divide),
+            '%' => Some(TokenType::Modulo),
+            '!' => Some(TokenType::Bang),
+            '<' => Some(TokenType::Less),
+            '>' => Some(TokenType::Greater),
+            '=' => Some(TokenType::Assign),
+            _ => None,
         }
     }
 
@@ -214,10 +160,10 @@ impl Lexer {
             "continue" => TokenType::Continue,
             "fn" => TokenType::Fn,
             "return" => TokenType::Return,
-            _ => TokenType::Identifier(ident.to_string()),
+            _ => TokenType::Identifier,
         };
 
-        self.make_token(kind, start, self.pos)
+        self.make_token(kind, ident.to_string(), start, self.pos)
     }
 
     fn bag_string(&mut self) -> Token {
@@ -234,7 +180,7 @@ impl Lexer {
         }
 
         let text: String = self.src[start..self.pos].to_string();
-        self.make_token(TokenType::String(text), start, self.pos)
+        self.make_token(TokenType::String, text, start, self.pos)
     }
 
     fn bag_number(&mut self) -> Token {
@@ -252,9 +198,8 @@ impl Lexer {
             };
         }
 
-        let text = &self.src[start..self.pos];
-        let item: i32 = text.parse().unwrap();
-        self.make_token(TokenType::Number(item), start, self.pos)
+        let text: String = self.src[start..self.pos].to_string();
+        self.make_token(TokenType::Number, text, start, self.pos)
     }
 
     fn next(&mut self) -> Option<char> {
@@ -271,10 +216,11 @@ impl Lexer {
         self.chars.get(self.pos + n).copied()
     }
 
-    fn make_token(&self, kind: TokenType, start: usize, end: usize) -> Token {
+    fn make_token(&self, kind: TokenType, lexeme: String, start: usize, end: usize) -> Token {
         Token {
             kind,
             span: start..end,
+            lexeme: lexeme,
         }
     }
 }
