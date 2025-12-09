@@ -167,19 +167,18 @@ impl Lexer {
     }
 
     fn bag_string(&mut self) -> Token {
-        let start = self.pos; // start of string "xxx"
         self.next(); // consume first "
+        let start = self.pos; // start of string "xxx"
 
         while let Some(ch) = self.peek() {
             if ch == '"' {
-                self.next(); // consume last "
                 break;
             }
-
             self.next();
         }
 
         let text: String = self.src[start..self.pos].to_string();
+        self.next(); // consume last "
         self.make_token(TokenType::String, text, start, self.pos)
     }
 
