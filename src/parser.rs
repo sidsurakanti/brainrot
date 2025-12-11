@@ -8,9 +8,9 @@ pub enum Stmt {
     Let(String, Expr),
     While(Expr, Box<Stmt>),
     For(Box<Stmt>, Expr, Expr, Box<Stmt>),
-    Fn(String, Vec<String>, Box<Stmt>),
+    Fn(String, Vec<Expr>, Box<Stmt>),
     Expr(Expr),
-    Call(String, Vec<String>),
+    Call(String, Vec<Expr>),
 }
 
 #[derive(Debug)]
@@ -91,7 +91,7 @@ impl Parser {
             TokenType::Identifier => {
                 let name = token.lexeme.clone();
                 self.next(); // consume ident
-                let args: Vec<String> = self.parse_args()?;
+                let args: Vec<Expr> = self.parse_args()?;
                 self.expect(TokenType::Semicolon, "expected ';' after expression")?;
                 Stmt::Call(name, args)
             }
@@ -123,21 +123,20 @@ impl Parser {
         Ok(Stmt::Block(statements))
     }
 
-    // params -> IDENT ("," IDENT)*
-    fn parse_args(&mut self) -> Result<Vec<String>, String> {
+    // params -> "(" expr ("," expr)* ")"
+    fn parse_args(&mut self) -> Result<Vec<Expr>, String> {
         self.expect(TokenType::LParen, "expected '(' after function")?;
-        let mut args: Vec<String> = vec![];
+        let mut args: Vec<Expr> = vec![];
 
-        if matches!(self.peek().kind, TokenType::Identifier) {
-            // push curr ident
-            let arg = self.expect(TokenType::Identifier, "expected arg")?;
-            args.push(arg.lexeme);
+        let arg = self.parse_expr()?; // returns error if expr not found
+        args.push(arg);
 
-            while self.peek().kind == TokenType::Comma {
-                self.expect(TokenType::Comma, "expected comma after arg")?;
-                let arg = self.expect(TokenType::Identifier, "expected arg")?;
-                args.push(arg.lexeme);
-            }
+        // parse rest of the args
+        while self.peek().kind == TokenType::Comma {
+            // consume comma
+            self.expect(TokenType::Comma, "expected comma after arg")?;
+            let arg = self.parse_expr()?;
+            args.push(arg);
         }
 
         self.expect(TokenType::RParen, "expected ')' after function call")?;

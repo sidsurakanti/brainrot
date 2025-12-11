@@ -9,6 +9,7 @@ whileStmt -> "while" "(" expr ")" statement
 forStmt -> "for" "(" letStmt expr ";" expr ")" statement
 fnDecl -> "fn" IDENT "(" params? ")" block
 exprStmt -> expr ";"
+callStmt -> IDENT "(" params? ")"
 
 expr -> equality
 equality -> comparison (("!=" | "==") comparison)*
@@ -18,7 +19,7 @@ term -> unary ("*" | "/") unary
 unary -> "-" unary | "!" unary | primary
 primary -> IDENT | NUMBER | STRING | "(" expr ")"
 
-params -> IDENT ("," IDENT)*
+params -> "(" expr ("," expr)* ")"
 
 
 

@@ -11,79 +11,6 @@ pub enum Value {
     Bool(bool),
 }
 
-impl Add for Value {
-    type Output = Result<Value, String>;
-
-    fn add(self, other: Value) -> Self::Output {
-        match (self, other) {
-            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a + b)),
-            (Value::Str(a), Value::Str(b)) => Ok(Value::Str(a + b.as_str())),
-            _ => Err("type mismatch".into()),
-        }
-    }
-}
-
-impl Sub for Value {
-    type Output = Result<Value, String>;
-    fn sub(self, other: Value) -> Self::Output {
-        match (self, other) {
-            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a - b)),
-            _ => Err("type mismatch".into()),
-        }
-    }
-}
-
-impl Neg for Value {
-    type Output = Result<Value, String>;
-
-    fn neg(self) -> Self::Output {
-        match self {
-            Value::Int(a) => Ok(Value::Int(-a)),
-            _ => Err("type mismatch".into()),
-        }
-    }
-}
-
-impl Not for Value {
-    type Output = Result<Value, String>;
-
-    fn not(self) -> Self::Output {
-        match self {
-            Value::Str(_) | Value::Int(_) => Ok(Value::Bool(false)),
-            Value::Bool(val) => Ok(Value::Bool(!val)),
-        }
-    }
-}
-
-impl Div for Value {
-    type Output = Result<Value, String>;
-
-    fn div(self, other: Value) -> Self::Output {
-        match (self, other) {
-            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a / b)),
-            _ => Err("type mismatch".into()),
-        }
-    }
-}
-
-impl Mul for Value {
-    type Output = Result<Value, String>;
-
-    fn mul(self, other: Value) -> Self::Output {
-        match (self, other) {
-            (Value::Str(s), Value::Int(n)) | (Value::Int(n), Value::Str(s)) => {
-                if n < 0 {
-                    return Err("cannot multiply string by a negative integer".into());
-                }
-
-                Ok(Value::Str(s.repeat(n as usize)))
-            }
-            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a * b)),
-            _ => Err("type mismatch".into()),
-        }
-    }
-}
-
 pub struct Interpreter {
     pub env: HashMap<String, Value>,
 }
@@ -160,6 +87,79 @@ impl Interpreter {
                 .cloned()
                 .ok_or_else(|| format!("undefined variable '{}'", name)),
             Expr::Group(e) => return self.eval_expr(*e),
+        }
+    }
+}
+
+impl Add for Value {
+    type Output = Result<Value, String>;
+
+    fn add(self, other: Value) -> Self::Output {
+        match (self, other) {
+            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a + b)),
+            (Value::Str(a), Value::Str(b)) => Ok(Value::Str(a + b.as_str())),
+            _ => Err("type mismatch".into()),
+        }
+    }
+}
+
+impl Sub for Value {
+    type Output = Result<Value, String>;
+    fn sub(self, other: Value) -> Self::Output {
+        match (self, other) {
+            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a - b)),
+            _ => Err("type mismatch".into()),
+        }
+    }
+}
+
+impl Neg for Value {
+    type Output = Result<Value, String>;
+
+    fn neg(self) -> Self::Output {
+        match self {
+            Value::Int(a) => Ok(Value::Int(-a)),
+            _ => Err("type mismatch".into()),
+        }
+    }
+}
+
+impl Not for Value {
+    type Output = Result<Value, String>;
+
+    fn not(self) -> Self::Output {
+        match self {
+            Value::Str(_) | Value::Int(_) => Ok(Value::Bool(false)),
+            Value::Bool(val) => Ok(Value::Bool(!val)),
+        }
+    }
+}
+
+impl Div for Value {
+    type Output = Result<Value, String>;
+
+    fn div(self, other: Value) -> Self::Output {
+        match (self, other) {
+            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a / b)),
+            _ => Err("type mismatch".into()),
+        }
+    }
+}
+
+impl Mul for Value {
+    type Output = Result<Value, String>;
+
+    fn mul(self, other: Value) -> Self::Output {
+        match (self, other) {
+            (Value::Str(s), Value::Int(n)) | (Value::Int(n), Value::Str(s)) => {
+                if n < 0 {
+                    return Err("cannot multiply string by a negative integer".into());
+                }
+
+                Ok(Value::Str(s.repeat(n as usize)))
+            }
+            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a * b)),
+            _ => Err("type mismatch".into()),
         }
     }
 }
