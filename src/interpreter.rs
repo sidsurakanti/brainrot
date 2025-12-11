@@ -97,7 +97,13 @@ impl Interpreter {
 
     pub fn run(&mut self, src: String) {
         let tokens = Lexer::new(src).tokenize();
-        let ast = Parser::new(tokens).parse().unwrap();
+        let res = Parser::new(tokens).parse();
+
+        let Ok(ast) = res else {
+            let e = res.err().unwrap();
+            return eprintln!("parser error: {:?}", e);
+        };
+
         self.eval(ast);
     }
 
@@ -107,7 +113,7 @@ impl Interpreter {
                 Stmt::Block(stmts) => self.eval(stmts),
                 Stmt::Let(name, expr) => self.eval_let(name, expr),
                 Stmt::Expr(expr) => {
-                    self.eval_expr(expr);
+                    self.eval_expr(expr).unwrap();
                 }
                 // Stmt::While(cond, block) => self.eval_while(cond, block),
                 // Stmt::For(init, cond, step, block) => self.eval_for(init, cond, step, block),

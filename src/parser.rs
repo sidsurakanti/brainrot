@@ -74,25 +74,31 @@ impl Parser {
 
         let statement: Stmt = match token.kind {
             TokenType::LBrace => self.parse_block()?,
+
             TokenType::Let => self.parse_let()?,
+
             TokenType::While => self.parse_while()?,
+
             TokenType::For => self.parse_for()?,
+
             // TokenType::Fn => self.parse_fn()?,
             TokenType::Identifier if self.at(1).kind != TokenType::LParen => {
                 let expr = self.parse_expr()?;
-                self.expect(TokenType::Semicolon, "expected ';' after expression");
+                self.expect(TokenType::Semicolon, "expected ';' after expression")?;
                 Stmt::Expr(expr)
             }
+
             TokenType::Identifier => {
                 let name = token.lexeme.clone();
                 self.next(); // consume ident
                 let args: Vec<String> = self.parse_args()?;
-                self.expect(TokenType::Semicolon, "expected ';' after expression");
+                self.expect(TokenType::Semicolon, "expected ';' after expression")?;
                 Stmt::Call(name, args)
             }
+
             _ => {
                 let expr = self.parse_expr()?;
-                self.expect(TokenType::Semicolon, "expected ';' after expression");
+                self.expect(TokenType::Semicolon, "expected ';' after expression")?;
                 Stmt::Expr(expr)
             }
         };
@@ -105,55 +111,55 @@ impl Parser {
         let mut statements = vec![];
 
         // consume LBrace
-        self.expect(TokenType::LBrace, "expected '{'");
+        self.expect(TokenType::LBrace, "expected '{'")?;
 
         while !self.check(TokenType::RBrace) {
             statements.push(self.parse_statement()?);
         }
 
         // consume RBrace
-        self.expect(TokenType::RBrace, "expected '}'");
+        self.expect(TokenType::RBrace, "expected '}'")?;
 
         Ok(Stmt::Block(statements))
     }
 
     // params -> IDENT ("," IDENT)*
     fn parse_args(&mut self) -> Result<Vec<String>, String> {
-        self.expect(TokenType::LParen, "expected '(' after function");
+        self.expect(TokenType::LParen, "expected '(' after function")?;
         let mut args: Vec<String> = vec![];
 
         if matches!(self.peek().kind, TokenType::Identifier) {
             // push curr ident
-            let arg = self.expect(TokenType::Identifier, "expected arg");
+            let arg = self.expect(TokenType::Identifier, "expected arg")?;
             args.push(arg.lexeme);
 
             while self.peek().kind == TokenType::Comma {
-                self.expect(TokenType::Comma, "expected comma after arg");
-                let arg = self.expect(TokenType::Identifier, "expected arg");
+                self.expect(TokenType::Comma, "expected comma after arg")?;
+                let arg = self.expect(TokenType::Identifier, "expected arg")?;
                 args.push(arg.lexeme);
             }
         }
 
-        self.expect(TokenType::RParen, "expected ')' after function call");
+        self.expect(TokenType::RParen, "expected ')' after function call")?;
         Ok(args)
     }
 
     // letStmt -> "let" IDENT "=" expr ";"
     fn parse_let(&mut self) -> Result<Stmt, String> {
         // consume let
-        self.expect(TokenType::Let, "expected 'let'");
+        self.expect(TokenType::Let, "expected 'let'")?;
 
-        let ident = self.expect(TokenType::Identifier, "expected identifier after let");
+        let ident = self.expect(TokenType::Identifier, "expected identifier after let")?;
         let name = ident.lexeme;
 
-        self.expect(TokenType::Assign, "expected assignment after identifier");
+        self.expect(TokenType::Assign, "expected assignment after identifier")?;
 
         let expr = self.parse_expr()?;
 
         self.expect(
             TokenType::Semicolon,
             "expected semicolon after end condition",
-        );
+        )?;
 
         Ok(Stmt::Let(name, expr))
     }
@@ -161,11 +167,11 @@ impl Parser {
     // whileStmt -> "while" "(" expr ")" statement
     fn parse_while(&mut self) -> Result<Stmt, String> {
         // consume while
-        self.expect(TokenType::While, "expected 'while'");
+        self.expect(TokenType::While, "expected 'while'")?;
 
-        self.expect(TokenType::LParen, "expected '(' after while");
+        self.expect(TokenType::LParen, "expected '(' after while")?;
         let cond: Expr = self.parse_expr()?;
-        self.expect(TokenType::RParen, "expected ')' after condition");
+        self.expect(TokenType::RParen, "expected ')' after condition")?;
         let block: Stmt = self.parse_block()?;
 
         Ok(Stmt::While(cond, Box::new(block)))
@@ -173,18 +179,18 @@ impl Parser {
 
     // forStmt -> "for" "(" letStmt expr ";" expr ")" statement
     fn parse_for(&mut self) -> Result<Stmt, String> {
-        self.expect(TokenType::For, "expected 'for'");
+        self.expect(TokenType::For, "expected 'for'")?;
 
-        self.expect(TokenType::LParen, "expected '(' after for");
+        self.expect(TokenType::LParen, "expected '(' after for")?;
 
         let init: Stmt = self.parse_let()?;
 
         let cond: Expr = self.parse_expr()?;
-        self.expect(TokenType::Semicolon, "expected ';' after end condition");
+        self.expect(TokenType::Semicolon, "expected ';' after end condition")?;
 
         let step: Expr = self.parse_expr()?;
 
-        self.expect(TokenType::RParen, "expected ')' after condition");
+        self.expect(TokenType::RParen, "expected ')' after condition")?;
 
         let block: Stmt = self.parse_block()?;
 
@@ -194,17 +200,16 @@ impl Parser {
     // fn parse_fn(&mut self) -> Result<Stmt, String> {}
 
     fn parse_expr(&mut self) -> Result<Expr, String> {
-        let expr = self.pratt(0);
-
+        let expr = self.pratt(0)?;
         Ok(expr)
     }
 
-    fn pratt(&mut self, min_bp: usize) -> Expr {
+    fn pratt(&mut self, min_bp: usize) -> Result<Expr, String> {
         // 6 * 2 + 3 / (3 + 2) -> (6 * 2) + (3 / (3 + 2))
         let start: Token = self.next();
         // println!("{:?}", start);
 
-        let mut lhs = self.nud(start);
+        let mut lhs = self.nud(start)?;
         // println!("{:?}", lhs);
 
         loop {
@@ -224,12 +229,12 @@ impl Parser {
 
             self.next(); // consume op
 
-            let rhs = self.pratt(rbp);
+            let rhs = self.pratt(rbp)?;
 
             lhs = Expr::Binary(Box::new(lhs), op, Box::new(rhs))
         }
 
-        lhs
+        Ok(lhs)
     }
 
     fn bp(&self, op: &TokenType) -> (usize, usize) {
@@ -240,30 +245,34 @@ impl Parser {
         self.lookup.contains_key(op)
     }
 
-    fn nud(&mut self, token: Token) -> Expr {
-        match token.kind {
+    fn nud(&mut self, token: Token) -> Result<Expr, String> {
+        let out = match token.kind {
             TokenType::Number => Expr::Number(token.lexeme.parse().unwrap()),
+
             TokenType::String => Expr::String(token.lexeme),
+
             TokenType::Identifier => Expr::Ident(token.lexeme),
 
             TokenType::Minus => {
-                let rhs = self.pratt(30);
+                let rhs = self.pratt(30)?;
                 Expr::Unary(TokenType::Minus, Box::new(rhs))
             }
 
             TokenType::Bang => {
-                let rhs = self.pratt(30);
+                let rhs = self.pratt(30)?;
                 Expr::Unary(TokenType::Bang, Box::new(rhs))
             }
 
             TokenType::LParen => {
-                let rhs = self.pratt(0);
-                self.expect(TokenType::RParen, "expected ')' after expression");
+                let rhs = self.pratt(0)?;
+                self.expect(TokenType::RParen, "expected ')' after expression")?;
                 Expr::Group(Box::new(rhs))
             }
 
-            other => panic!("unexpected token in nud: {:?}", other),
-        }
+            other => return Err(format!("unexpected token in nud: {:?}", other)),
+        };
+
+        Ok(out)
     }
 
     fn check(&mut self, kind: TokenType) -> bool {
@@ -274,12 +283,12 @@ impl Parser {
         std::mem::discriminant(&self.peek().kind) == std::mem::discriminant(&kind)
     }
 
-    fn expect(&mut self, kind: TokenType, msg: &str) -> Token {
+    fn expect(&mut self, kind: TokenType, msg: &str) -> Result<Token, String> {
         if !self.check(kind) {
-            panic!("{} at {:#?}", msg, self.peek().span);
+            return Err(format!("{} at {:#?}", msg, self.peek().span));
         }
 
-        self.next()
+        Ok(self.next())
     }
 
     fn peek(&self) -> &Token {
