@@ -8,6 +8,7 @@ use crate::lexer::Lexer;
 use crate::parser::{Parser, Stmt};
 use std::fs;
 
+#[allow(dead_code)]
 fn main() {
     let src = fs::read_to_string("src/brain.rot").unwrap();
 

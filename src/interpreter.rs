@@ -1,20 +1,32 @@
 use crate::lexer::Lexer;
 use crate::parser::{Expr, Parser, Stmt};
 use crate::token::TokenType;
+use std::cmp::{Ordering, PartialEq, PartialOrd};
 use std::collections::HashMap;
 use std::ops::{Add, Div, Mul, Neg, Not, Sub};
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum Value {
     Int(i32),
     Str(String),
     Bool(bool),
+    Void,
+}
+
+#[derive(Debug)]
+pub enum ControlFlow {
+    None,
+    Continue,
+    Break,
+    Return(Value),
 }
 
 pub struct Interpreter {
     pub env: HashMap<String, Value>,
 }
 
+#[allow(dead_code)]
 impl Interpreter {
     pub fn new() -> Self {
         Self {
@@ -36,16 +48,97 @@ impl Interpreter {
 
     fn eval(&mut self, ast: Vec<Stmt>) {
         for stmt in ast {
-            match stmt {
-                Stmt::Block(stmts) => self.eval(stmts),
-                Stmt::Let(name, expr) => self.eval_let(name, expr),
-                Stmt::Expr(expr) => {
-                    self.eval_expr(expr).unwrap();
+            // at top level every stmt has to yield a cf::none
+            let cf = self.eval_stmt(stmt.clone());
+            if !matches!(cf, ControlFlow::None) {
+                panic!(
+                    "invalid control flow at top level {:?} in statement {:#?}",
+                    cf,
+                    stmt.clone()
+                )
+            }
+        }
+    }
+
+    fn eval_stmt(&mut self, stmt: Stmt) -> ControlFlow {
+        match stmt {
+            Stmt::Block(stmts) => {
+                for stmt in stmts {
+                    let res = self.eval_stmt(stmt);
+                    match res {
+                        // propogate these up
+                        ControlFlow::Continue => return ControlFlow::Continue,
+                        ControlFlow::Break => return ControlFlow::Break,
+                        ControlFlow::Return(v) => return ControlFlow::Return(v),
+                        ControlFlow::None => {}
+                    }
                 }
-                // Stmt::While(cond, block) => self.eval_while(cond, block),
-                // Stmt::For(init, cond, step, block) => self.eval_for(init, cond, step, block),
-                // Stmt::Call(name, args) => self.eval_call(name, args),
-                _ => panic!("unimplemented"),
+
+                ControlFlow::None
+            }
+            Stmt::Let(name, expr) => {
+                self.eval_let(name, expr);
+                ControlFlow::None
+            }
+            Stmt::Expr(expr) => {
+                self.eval_expr(expr).unwrap();
+                ControlFlow::None
+            }
+            Stmt::While(cond, block) => {
+                self.eval_while(cond, block);
+                ControlFlow::None
+            }
+            Stmt::Return(expr) => {
+                if let Some(e) = expr {
+                    let ret = self.eval_expr(e).unwrap();
+                    ControlFlow::Return(ret)
+                } else {
+                    ControlFlow::Return(Value::Void)
+                }
+            }
+            Stmt::Continue => ControlFlow::Continue,
+            Stmt::Break => ControlFlow::Break,
+            Stmt::Assignment(name, expr) => {
+                // make sure name is already defined
+                if self.env.contains_key(&name) {
+                    self.eval_let(name, expr);
+                } else {
+                    panic!("cannot reassign uninitialized variable '{:?}'", name)
+                }
+                ControlFlow::None
+            }
+            Stmt::If(cond, block) => {
+                self.eval_if(cond, block);
+                ControlFlow::None
+            }
+
+            // Stmt::For(init, cond, step, block) => self.eval_for(init, cond, step, block),
+            // Stmt::Call(name, args) => self.eval_call(name, args),
+            _ => panic!("unimplemented: {:?}", stmt),
+        }
+    }
+
+    fn eval_if(&mut self, cond: Expr, block: Box<Stmt>) {
+        let block = *block.clone();
+        let stmts = match block {
+            Stmt::Block(v) => v,
+            _ => panic!("expected to unwrap block after while condition"),
+        };
+
+        if self.eval_expr(cond.clone()).unwrap().is_truthy() {
+            for stmt in stmts.clone() {
+                self.eval_stmt(stmt);
+            }
+        }
+    }
+
+    fn eval_while(&mut self, cond: Expr, block: Box<Stmt>) {
+        'outer: while self.eval_expr(cond.clone()).unwrap().is_truthy() {
+            match self.eval_stmt(*block.clone()) {
+                ControlFlow::Continue => continue 'outer,
+                ControlFlow::Break => break 'outer,
+                ControlFlow::None => {}
+                ControlFlow::Return(_) => panic!("unexpected return inside loop"),
             }
         }
     }
@@ -67,7 +160,29 @@ impl Interpreter {
                     TokenType::Minus => l - r,
                     TokenType::Times => l * r,
                     TokenType::Divide => l / r,
-                    _ => return Err("unimplemented".into()),
+                    TokenType::Less => {
+                        let res = l.partial_cmp(&r);
+                        let b = matches!(res, Some(Ordering::Less));
+                        Ok(Value::Bool(b))
+                    }
+                    TokenType::Greater => {
+                        let res = l.partial_cmp(&r);
+                        let b = matches!(res, Some(Ordering::Greater));
+                        Ok(Value::Bool(b))
+                    }
+                    TokenType::LessEqual => {
+                        let res = l.partial_cmp(&r);
+                        let b = matches!(res, Some(Ordering::Equal) | Some(Ordering::Less));
+                        Ok(Value::Bool(b))
+                    }
+                    TokenType::GreaterEqual => {
+                        let res = l.partial_cmp(&r);
+                        let b = matches!(res, Some(Ordering::Equal) | Some(Ordering::Greater));
+                        Ok(Value::Bool(b))
+                    }
+                    TokenType::EqualEqual => Ok(Value::Bool(l == r)),
+                    TokenType::NotEqual => Ok(Value::Bool(l != r)),
+                    _ => return Err(format!("unimplemented {:?}", op)),
                 }
             }
             Expr::Unary(op, right) => {
@@ -131,6 +246,7 @@ impl Not for Value {
         match self {
             Value::Str(_) | Value::Int(_) => Ok(Value::Bool(false)),
             Value::Bool(val) => Ok(Value::Bool(!val)),
+            Value::Void => Err("cannot evaluate not for void".into()),
         }
     }
 }
@@ -160,6 +276,39 @@ impl Mul for Value {
             }
             (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a * b)),
             _ => Err("type mismatch".into()),
+        }
+    }
+}
+
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Value::Int(a), Value::Int(b)) => a == b,
+            (Value::Str(a), Value::Str(b)) => a == b,
+            (Value::Bool(a), Value::Bool(b)) => a == b,
+            _ => false,
+        }
+    }
+}
+
+impl PartialOrd for Value {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match (self, other) {
+            (Value::Int(a), Value::Int(b)) => a.partial_cmp(b),
+            (Value::Str(a), Value::Str(b)) => a.partial_cmp(b),
+            (Value::Bool(a), Value::Bool(b)) => a.partial_cmp(b),
+            _ => None,
+        }
+    }
+}
+
+impl Value {
+    pub fn is_truthy(&self) -> bool {
+        match self {
+            Value::Int(n) => !(*n == 0),
+            Value::Bool(b) => *b,
+            Value::Str(s) => !s.is_empty(),
+            Value::Void => false,
         }
     }
 }

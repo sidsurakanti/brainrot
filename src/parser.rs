@@ -2,18 +2,25 @@ use crate::token::{Token, TokenType};
 use maplit::hashmap;
 use std::collections::HashMap;
 
-#[derive(Debug)]
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
 pub enum Stmt {
     Block(Vec<Stmt>),
     Let(String, Expr),
     While(Expr, Box<Stmt>),
     For(Box<Stmt>, Expr, Expr, Box<Stmt>),
     Fn(String, Vec<Expr>, Box<Stmt>),
+    If(Expr, Box<Stmt>),
     Expr(Expr),
     Call(String, Vec<Expr>),
+    Assignment(String, Expr),
+    Return(Option<Expr>),
+    Continue,
+    Break,
 }
 
-#[derive(Debug)]
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
 pub enum Expr {
     Binary(Box<Expr>, TokenType, Box<Expr>),
     Unary(TokenType, Box<Expr>),
@@ -81,19 +88,61 @@ impl Parser {
 
             TokenType::For => self.parse_for()?,
 
+            TokenType::If => self.parse_if()?,
+
             // TokenType::Fn => self.parse_fn()?,
-            TokenType::Identifier if self.at(1).kind != TokenType::LParen => {
-                let expr = self.parse_expr()?;
-                self.expect(TokenType::Semicolon, "expected ';' after expression")?;
-                Stmt::Expr(expr)
+            TokenType::Identifier => {
+                match self.at(1).kind {
+                    // assignStmt -> IDENT "=" expr
+                    TokenType::Assign => {
+                        // consume ident
+                        let name = self.next().lexeme;
+
+                        self.expect(TokenType::Assign, "expected '='")?;
+                        let expr = self.parse_expr()?;
+                        self.expect(TokenType::Semicolon, "expected ';' after continue")?;
+
+                        Stmt::Assignment(name, expr)
+                    }
+                    // callStmt -> IDENT "(" params? ")"
+                    TokenType::LParen => {
+                        let name = token.lexeme.clone();
+                        self.next(); // consume ident
+
+                        let args: Vec<Expr> = self.parse_args()?;
+                        self.expect(TokenType::Semicolon, "expected ';' after expression")?;
+                        Stmt::Call(name, args)
+                    }
+                    // expr
+                    _ => {
+                        let expr = self.parse_expr()?;
+                        self.expect(TokenType::Semicolon, "expected ';' after expression")?;
+                        Stmt::Expr(expr)
+                    }
+                }
             }
 
-            TokenType::Identifier => {
-                let name = token.lexeme.clone();
-                self.next(); // consume ident
-                let args: Vec<Expr> = self.parse_args()?;
-                self.expect(TokenType::Semicolon, "expected ';' after expression")?;
-                Stmt::Call(name, args)
+            TokenType::Continue => {
+                self.next();
+                self.expect(TokenType::Semicolon, "expected ';' after continue")?;
+                Stmt::Continue
+            }
+
+            TokenType::Break => {
+                self.next(); // consume curr tok
+                self.expect(TokenType::Semicolon, "expected ';' after break")?;
+                Stmt::Break
+            }
+
+            TokenType::Return => {
+                self.next(); // consume ret
+                if self.peek().kind != TokenType::Semicolon {
+                    let expr = self.parse_expr()?;
+                    Stmt::Return(Some(expr))
+                } else {
+                    self.expect(TokenType::Semicolon, "expected ';' after return")?;
+                    Stmt::Return(None)
+                }
             }
 
             _ => {
@@ -196,6 +245,18 @@ impl Parser {
         Ok(Stmt::For(Box::new(init), cond, step, Box::new(block)))
     }
 
+    fn parse_if(&mut self) -> Result<Stmt, String> {
+        self.next(); // if
+
+        self.expect(TokenType::LParen, "expected '(' after while")?;
+        let cond: Expr = self.parse_expr()?;
+        self.expect(TokenType::RParen, "expected ')' after condition")?;
+
+        let block = self.parse_block()?;
+
+        Ok(Stmt::If(cond, Box::new(block)))
+    }
+
     // fn parse_fn(&mut self) -> Result<Stmt, String> {}
 
     fn parse_expr(&mut self) -> Result<Expr, String> {
@@ -268,7 +329,13 @@ impl Parser {
                 Expr::Group(Box::new(rhs))
             }
 
-            other => return Err(format!("unexpected token in nud: {:?}", other)),
+            other => {
+                return Err(format!(
+                    "unexpected token in nud: {:?} {:#?}",
+                    other,
+                    self.peek().span
+                ));
+            }
         };
 
         Ok(out)

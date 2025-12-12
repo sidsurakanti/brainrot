@@ -1,6 +1,6 @@
 program -> statement* EOF
 
-statement -> block | letStmt | ifStmt | whileStmt | forStmt | fnDecl | exprStmt
+statement -> block | letStmt | ifStmt | whileStmt | forStmt | fnDecl | exprStmt | callStmt
 
 block -> "{" statement* "}"
 letStmt -> "let" IDENT "=" expr ";"
@@ -10,14 +10,19 @@ forStmt -> "for" "(" letStmt expr ";" expr ")" statement
 fnDecl -> "fn" IDENT "(" params? ")" block
 exprStmt -> expr ";"
 callStmt -> IDENT "(" params? ")"
+assignStmt -> IDENT "=" expr
 
 expr -> equality
 equality -> comparison (("!=" | "==") comparison)*
 comparison -> term ((">" | "<" | ">=" | "<=") term)*
 term -> factor ("+" | "-") factor
-term -> unary ("*" | "/") unary
+factor -> unary ("*" | "/") unary
 unary -> "-" unary | "!" unary | primary
 primary -> IDENT | NUMBER | STRING | "(" expr ")"
+
+let a = 2 * 3 + 5 == -1 * 230 + (6 + 2);
+let a = ((2 * 3) + 5) == (((-1) * 230) + (6 + 2));
+let a = -2
 
 params -> "(" expr ("," expr)* ")"
 
