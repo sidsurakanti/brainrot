@@ -1,3 +1,4 @@
+// %%%%% arithmetic %%%%%
 let a = 1 + 2 * 3; // expect 7
 let b = (1 + 2) * 3; // expect 9
 let c = -a; // expect -7
@@ -9,7 +10,7 @@ let f = "hello " + "world"; // expect "hello world"
 // %%%%%% if statements %%%%%
 let d = 13;
 
-if (d < 10) {
+if (d <= 10) {
   d = d + 1;
 } elif (15 > d) {
   d = d - 1;
@@ -20,13 +21,20 @@ if (d < 10) {
 }
 
 // %%%%%%% while %%%%%%%%%%
+let a = 0;
 while (a <= 10) {
   a = a + 1;
   break;
 }
 
+// %%%% comparisions %%%
+let a = true;
+let b = true;
+let c = a == "2";
+
+
+// not implemented 
 for (let i = 0; i < 10; i = i + 1) {
   a = a + 1;
 }
-
 print();

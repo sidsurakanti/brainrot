@@ -102,6 +102,7 @@ impl Interpreter {
             Stmt::Assignment(name, expr) => {
                 // make sure var is already defined
                 if self.env.contains_key(&name) {
+                    // println!("reassignment {:#?}", expr);
                     self.eval_let(name, expr);
                 } else {
                     // TODO: better errors
