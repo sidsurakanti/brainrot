@@ -11,7 +11,7 @@ pub enum Value {
     Int(i32),
     Str(String),
     Bool(bool),
-    Void,
+    Null,
 }
 
 #[derive(Debug)]
@@ -63,7 +63,7 @@ impl Interpreter {
     fn eval_stmt(&mut self, stmt: Stmt) -> ControlFlow {
         match stmt {
             Stmt::Block(stmts) => {
-                // TODO: handle in-loop v. out
+                // TODO: handle in-loop v. out for return
                 for stmt in stmts {
                     let res = self.eval_stmt(stmt);
                     match res {
@@ -94,7 +94,7 @@ impl Interpreter {
                     let ret = self.eval_expr(e).unwrap();
                     ControlFlow::Return(ret)
                 } else {
-                    ControlFlow::Return(Value::Void)
+                    ControlFlow::Return(Value::Null)
                 }
             }
             Stmt::Continue => ControlFlow::Continue,
@@ -114,10 +114,7 @@ impl Interpreter {
                 cond,
                 then_branch,
                 else_branch,
-            } => {
-                self.eval_if(cond, then_branch, else_branch);
-                ControlFlow::None
-            }
+            } => self.eval_if(cond, then_branch, else_branch),
 
             // Stmt::For(init, cond, step, block) => self.eval_for(init, cond, step, block),
             // Stmt::Call(name, args) => self.eval_call(name, args),
@@ -126,21 +123,23 @@ impl Interpreter {
     }
 
     // ifStmt -> "if" "(" expr ")" block ("elif" block)* ("else" block)?
-    fn eval_if(&mut self, cond: Expr, then_branch: Box<Stmt>, else_branch: Option<Box<Stmt>>) {
-        let block = *then_branch.clone();
-        let stmts = match block {
-            Stmt::Block(v) => v,
-            _ => panic!("expected to unwrap block after while condition"),
-        };
+    fn eval_if(
+        &mut self,
+        cond: Expr,
+        then_branch: Box<Stmt>,
+        else_branch: Option<Box<Stmt>>,
+    ) -> ControlFlow {
+        let block = then_branch; // Stmt::Block
 
         if self.eval_expr(cond.clone()).unwrap().is_truthy() {
-            for stmt in stmts.clone() {
-                self.eval_stmt(stmt);
-            }
+            self.eval_stmt(*block.clone())
         } else {
+            // else_block == Stmt::If || None
             if let Some(else_block) = else_branch {
                 // else_block is of type Stmt::If or None
-                self.eval_stmt(*else_block);
+                self.eval_stmt(*else_block)
+            } else {
+                ControlFlow::None
             }
         }
     }
@@ -210,7 +209,7 @@ impl Interpreter {
             Expr::Number(val) => Ok(Value::Int(val)),
             Expr::String(val) => Ok(Value::Str(val)),
             Expr::Bool(b) => Ok(Value::Bool(b)),
-            Expr::Null => Ok(Value::Void),
+            Expr::Null => Ok(Value::Null),
             Expr::Ident(name) => self
                 .env
                 .get(&name)
@@ -259,9 +258,9 @@ impl Not for Value {
 
     fn not(self) -> Self::Output {
         match self {
-            Value::Str(_) | Value::Int(_) => Ok(Value::Bool(false)),
+            Value::Str(_) | Value::Int(_) => Ok(Value::Bool(self.is_truthy())),
             Value::Bool(val) => Ok(Value::Bool(!val)),
-            Value::Void => Err("cannot evaluate not for void".into()),
+            Value::Null => Err("cannot evaluate not for void".into()),
         }
     }
 }
@@ -271,7 +270,13 @@ impl Div for Value {
 
     fn div(self, other: Value) -> Self::Output {
         match (self, other) {
-            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a / b)),
+            (Value::Int(a), Value::Int(b)) => {
+                if b == 0 {
+                    Err("cannot divide by zero".into())
+                } else {
+                    Ok(Value::Int(a / b))
+                }
+            }
             _ => Err("type mismatch".into()),
         }
     }
@@ -323,7 +328,7 @@ impl Value {
             Value::Int(n) => !(*n == 0),
             Value::Bool(b) => *b,
             Value::Str(s) => !s.is_empty(),
-            Value::Void => false,
+            Value::Null => false,
         }
     }
 }

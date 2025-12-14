@@ -12,7 +12,7 @@ pub enum Stmt {
     Fn(String, Vec<Expr>, Box<Stmt>),
     If {
         cond: Expr,
-        then_branch: Box<Stmt>,
+        then_branch: Box<Stmt>, // Stmt::Block
         else_branch: Option<Box<Stmt>>,
     },
     Expr(Expr),
