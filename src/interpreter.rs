@@ -48,7 +48,7 @@ impl Interpreter {
 
     fn eval(&mut self, ast: Vec<Stmt>) {
         for stmt in ast {
-            // at top level every stmt has to yield a cf::none
+            // stmt only valid iff yielding ControlFLow::None at top level
             let cf = self.eval_stmt(stmt.clone());
             if !matches!(cf, ControlFlow::None) {
                 panic!(
@@ -63,10 +63,11 @@ impl Interpreter {
     fn eval_stmt(&mut self, stmt: Stmt) -> ControlFlow {
         match stmt {
             Stmt::Block(stmts) => {
+                // TODO: handle in-loop v. out
                 for stmt in stmts {
                     let res = self.eval_stmt(stmt);
                     match res {
-                        // propogate these up
+                        // wlog, a block short circuits on non-none
                         ControlFlow::Continue => return ControlFlow::Continue,
                         ControlFlow::Break => return ControlFlow::Break,
                         ControlFlow::Return(v) => return ControlFlow::Return(v),
@@ -99,16 +100,21 @@ impl Interpreter {
             Stmt::Continue => ControlFlow::Continue,
             Stmt::Break => ControlFlow::Break,
             Stmt::Assignment(name, expr) => {
-                // make sure name is already defined
+                // make sure var is already defined
                 if self.env.contains_key(&name) {
                     self.eval_let(name, expr);
                 } else {
+                    // TODO: better errors
                     panic!("cannot reassign uninitialized variable '{:?}'", name)
                 }
                 ControlFlow::None
             }
-            Stmt::If(cond, block) => {
-                self.eval_if(cond, block);
+            Stmt::If {
+                cond,
+                then_branch,
+                else_branch,
+            } => {
+                self.eval_if(cond, then_branch, else_branch);
                 ControlFlow::None
             }
 
@@ -118,8 +124,9 @@ impl Interpreter {
         }
     }
 
-    fn eval_if(&mut self, cond: Expr, block: Box<Stmt>) {
-        let block = *block.clone();
+    // ifStmt -> "if" "(" expr ")" block ("elif" block)* ("else" block)?
+    fn eval_if(&mut self, cond: Expr, then_branch: Box<Stmt>, else_branch: Option<Box<Stmt>>) {
+        let block = *then_branch.clone();
         let stmts = match block {
             Stmt::Block(v) => v,
             _ => panic!("expected to unwrap block after while condition"),
@@ -128,6 +135,11 @@ impl Interpreter {
         if self.eval_expr(cond.clone()).unwrap().is_truthy() {
             for stmt in stmts.clone() {
                 self.eval_stmt(stmt);
+            }
+        } else {
+            if let Some(else_block) = else_branch {
+                // else_block is of type Stmt::If or None
+                self.eval_stmt(*else_block);
             }
         }
     }

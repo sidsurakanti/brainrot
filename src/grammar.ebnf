@@ -3,14 +3,14 @@ program -> statement* EOF
 statement -> block | letStmt | ifStmt | whileStmt | forStmt | fnDecl | exprStmt | callStmt
 
 block -> "{" statement* "}"
-letStmt -> "let" IDENT "=" expr ";"
-ifStmt -> "if" "(" expr ")" statement "else" statement
-whileStmt -> "while" "(" expr ")" statement
-forStmt -> "for" "(" letStmt expr ";" expr ")" statement
-fnDecl -> "fn" IDENT "(" params? ")" block
 exprStmt -> expr ";"
+letStmt -> "let" IDENT "=" expr ";"
+assignStmt -> IDENT "=" exprStmt
+ifStmt -> "if" "(" expr ")" block ("elif" block)* ("else" block)?
+whileStmt -> "while" "(" expr ")" block
+forStmt -> "for" "(" letStmt expr ";" expr ")" bloc
+fnDecl -> "fn" IDENT "(" params? ")" block
 callStmt -> IDENT "(" params? ")"
-assignStmt -> IDENT "=" expr
 
 expr -> equality
 equality -> comparison (("!=" | "==") comparison)*
@@ -19,10 +19,6 @@ term -> factor ("+" | "-") factor
 factor -> unary ("*" | "/") unary
 unary -> "-" unary | "!" unary | primary
 primary -> IDENT | NUMBER | STRING | "(" expr ")"
-
-let a = 2 * 3 + 5 == -1 * 230 + (6 + 2);
-let a = ((2 * 3) + 5) == (((-1) * 230) + (6 + 2));
-let a = -2
 
 params -> "(" expr ("," expr)* ")"
 

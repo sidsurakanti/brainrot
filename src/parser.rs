@@ -10,7 +10,12 @@ pub enum Stmt {
     While(Expr, Box<Stmt>),
     For(Box<Stmt>, Expr, Expr, Box<Stmt>),
     Fn(String, Vec<Expr>, Box<Stmt>),
-    If(Expr, Box<Stmt>),
+    // If(Expr, Box<Stmt>, Option<Vec<Box<Stmt>>>, Option<Box<Stmt>>), // if, elif*, else?
+    If {
+        cond: Expr,
+        then_branch: Box<Stmt>,
+        else_branch: Option<Box<Stmt>>,
+    },
     Expr(Expr),
     Call(String, Vec<Expr>),
     Assignment(String, Expr),
@@ -245,8 +250,9 @@ impl Parser {
         Ok(Stmt::For(Box::new(init), cond, step, Box::new(block)))
     }
 
+    // ifStmt -> "if" "(" expr ")" block ("elif" block)* ("else" block)?
     fn parse_if(&mut self) -> Result<Stmt, String> {
-        self.next(); // if
+        self.next(); // precondition: curr tok == if || elif
 
         self.expect(TokenType::LParen, "expected '(' after while")?;
         let cond: Expr = self.parse_expr()?;
@@ -254,7 +260,53 @@ impl Parser {
 
         let block = self.parse_block()?;
 
-        Ok(Stmt::If(cond, Box::new(block)))
+        // if (0) {}
+        // elif (1) {}
+        // elif (2) {}
+        // else {}
+        //
+        // =>
+        //
+        // if (0) {}
+        // else {
+        //  if (1) {}
+        //  else {
+        //      if (2) {}
+        //      else {}
+        //  }
+        // }
+        //
+        // 1) parse if stmt
+        // 2) see elif -> recurse parse if stmt
+        // 3) repeat until else is spotted
+        // 4) return else block
+
+        // check for else blocks
+        let mut else_branches: Option<Box<Stmt>> = None;
+        loop {
+            match self.peek().kind {
+                // wlog, elif reduces to else statements containing if statements
+                TokenType::Elif => {
+                    else_branches = Some(Box::new(self.parse_if()?));
+                }
+                TokenType::Else => {
+                    self.next(); // else
+                    // TODO: this works for now, move to else block
+                    else_branches = Some(Box::new(Stmt::If {
+                        cond: Expr::Number(1),
+                        then_branch: Box::new(self.parse_block()?),
+                        else_branch: None,
+                    }))
+                }
+                _ => break,
+            }
+        }
+
+        Ok(Stmt::If {
+            cond,
+            then_branch: Box::new(block),
+            else_branch: else_branches,
+        })
     }
 
     // fn parse_fn(&mut self) -> Result<Stmt, String> {}

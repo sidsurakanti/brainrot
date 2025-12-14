@@ -1,11 +1,11 @@
-let a = 9;
+let d = 13;
 
-while (a <= 10) {
-  a = a + 1;
-  break;
+if (d < 10) {
+  d = d + 1;
+} elif (15 > d) {
+  d = d - 1;
+} elif (d == 15) {
+  d = 0;
+} else {
+  d = d + 20;
 }
-
-if (a <= 10) {
-  a = 0;
-}
-

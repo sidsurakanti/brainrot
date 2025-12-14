@@ -43,6 +43,7 @@ pub enum TokenType {
     And,
     Or,
     If,
+    Elif,
     Else,
     For,
     While,

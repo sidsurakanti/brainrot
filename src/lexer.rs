@@ -153,6 +153,7 @@ impl Lexer {
             "and" => TokenType::And,
             "or" => TokenType::Or,
             "if" => TokenType::If,
+            "elif" => TokenType::Elif,
             "else" => TokenType::Else,
             "for" => TokenType::For,
             "while" => TokenType::While,
