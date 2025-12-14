@@ -20,7 +20,7 @@ factor -> unary ("*" | "/") unary
 unary -> "-" unary | "!" unary | primary
 primary -> IDENT | NUMBER | STRING | "(" expr ")"
 
-params -> "(" expr ("," expr)* ")"
+params -> "(" (expr ("," expr)*)? ")"
 
 
 

@@ -9,3 +9,8 @@ if (d < 10) {
 } else {
   d = d + 20;
 }
+
+let a = true;
+let b = true;
+
+let c = 2 == "2";

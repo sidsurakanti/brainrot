@@ -10,7 +10,6 @@ pub enum Stmt {
     While(Expr, Box<Stmt>),
     For(Box<Stmt>, Expr, Expr, Box<Stmt>),
     Fn(String, Vec<Expr>, Box<Stmt>),
-    // If(Expr, Box<Stmt>, Option<Vec<Box<Stmt>>>, Option<Box<Stmt>>), // if, elif*, else?
     If {
         cond: Expr,
         then_branch: Box<Stmt>,
@@ -33,6 +32,8 @@ pub enum Expr {
     Ident(String),
     String(String),
     Group(Box<Expr>),
+    Bool(bool),
+    Null,
 }
 
 // lexer.tokenize() -> Vec<Token> ->
@@ -177,10 +178,16 @@ impl Parser {
         Ok(Stmt::Block(statements))
     }
 
-    // params -> "(" expr ("," expr)* ")"
+    // params -> "(" (expr ("," expr)*)? ")"
     fn parse_args(&mut self) -> Result<Vec<Expr>, String> {
         self.expect(TokenType::LParen, "expected '(' after function")?;
+
         let mut args: Vec<Expr> = vec![];
+
+        if self.check(TokenType::RParen) {
+            self.next();
+            return Ok(args);
+        }
 
         let arg = self.parse_expr()?; // returns error if expr not found
         args.push(arg);
@@ -260,20 +267,15 @@ impl Parser {
 
         let block = self.parse_block()?;
 
+        // NOTE:
         // if (0) {}
         // elif (1) {}
-        // elif (2) {}
         // else {}
-        //
-        // =>
-        //
+        // ======>
         // if (0) {}
         // else {
         //  if (1) {}
-        //  else {
-        //      if (2) {}
-        //      else {}
-        //  }
+        //  else {}
         // }
         //
         // 1) parse if stmt
@@ -281,26 +283,19 @@ impl Parser {
         // 3) repeat until else is spotted
         // 4) return else block
 
-        // check for else blocks
-        let mut else_branches: Option<Box<Stmt>> = None;
-        loop {
-            match self.peek().kind {
-                // wlog, elif reduces to else statements containing if statements
-                TokenType::Elif => {
-                    else_branches = Some(Box::new(self.parse_if()?));
-                }
-                TokenType::Else => {
-                    self.next(); // else
-                    // TODO: this works for now, move to else block
-                    else_branches = Some(Box::new(Stmt::If {
-                        cond: Expr::Number(1),
-                        then_branch: Box::new(self.parse_block()?),
-                        else_branch: None,
-                    }))
-                }
-                _ => break,
+        let else_branches: Option<Box<Stmt>> = match self.peek().kind {
+            // wlog, elif reduces to else statements containing if statements
+            TokenType::Elif => Some(Box::new(self.parse_if()?)),
+            TokenType::Else => {
+                self.next(); // consume else
+                Some(Box::new(Stmt::If {
+                    cond: Expr::Bool(true),
+                    then_branch: Box::new(self.parse_block()?),
+                    else_branch: None,
+                }))
             }
-        }
+            _ => None,
+        };
 
         Ok(Stmt::If {
             cond,
@@ -360,9 +355,9 @@ impl Parser {
     fn nud(&mut self, token: Token) -> Result<Expr, String> {
         let out = match token.kind {
             TokenType::Number => Expr::Number(token.lexeme.parse().unwrap()),
-
             TokenType::String => Expr::String(token.lexeme),
-
+            TokenType::True => Expr::Bool(true),
+            TokenType::False => Expr::Bool(false),
             TokenType::Identifier => Expr::Ident(token.lexeme),
 
             TokenType::Minus => {

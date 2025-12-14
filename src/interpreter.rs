@@ -208,6 +208,8 @@ impl Interpreter {
             }
             Expr::Number(val) => Ok(Value::Int(val)),
             Expr::String(val) => Ok(Value::Str(val)),
+            Expr::Bool(b) => Ok(Value::Bool(b)),
+            Expr::Null => Ok(Value::Void),
             Expr::Ident(name) => self
                 .env
                 .get(&name)
