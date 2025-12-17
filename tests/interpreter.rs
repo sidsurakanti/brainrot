@@ -1,7 +1,98 @@
 use brainrot::interpreter::Interpreter;
-use brainrot::interpreter::Value;
+use brainrot::value::Value;
 
 // TODO: assert .run().is_ok() after converting errors from panic
+
+#[test]
+fn block_scope_does_not_leak() {
+    let mut i = Interpreter::new();
+    i.run(
+        r#"
+        {
+            let x = 10;
+        }
+    "#
+        .into(),
+    );
+
+    assert!(i.env.get("x").is_none());
+}
+
+#[test]
+fn inner_scope_can_read_outer() {
+    let mut i = Interpreter::new();
+    i.run(
+        r#"
+        let x = 5;
+        {
+            let y = x + 1;
+        }
+    "#
+        .into(),
+    );
+
+    assert_eq!(i.env["x"], Value::Int(5));
+}
+
+#[test]
+fn inner_scope_can_shadow_outer() {
+    let mut i = Interpreter::new();
+    i.run(
+        r#"
+        let x = 1;
+        {
+            let x = 2;
+        }
+    "#
+        .into(),
+    );
+
+    assert_eq!(i.env["x"], Value::Int(1));
+}
+
+#[test]
+fn assignment_updates_nearest_scope() {
+    let mut i = Interpreter::new();
+    i.run(
+        r#"
+        let x = 1;
+        {
+            x = 2;
+        }
+    "#
+        .into(),
+    );
+
+    assert_eq!(i.env["x"], Value::Int(2));
+}
+
+#[test]
+fn for_loop_scope_does_not_leak() {
+    let mut i = Interpreter::new();
+    i.run(
+        r#"
+        for (let i = 0; i < 3; i = i + 1) {
+            let x = i;
+        }
+    "#
+        .into(),
+    );
+
+    assert!(i.env.get("i").is_none());
+    assert!(i.env.get("x").is_none());
+}
+
+#[test]
+#[should_panic]
+fn assigning_undefined_variable_panics() {
+    let mut i = Interpreter::new();
+    i.run(
+        r#"
+        x = 10;
+    "#
+        .into(),
+    );
+}
 
 #[test]
 fn arithmetic_ops() {

@@ -1,18 +1,9 @@
+use crate::env::Env;
 use crate::lexer::Lexer;
 use crate::parser::{Expr, Parser, Stmt};
 use crate::token::TokenType;
-use std::cmp::{Ordering, PartialEq, PartialOrd};
-use std::collections::HashMap;
-use std::ops::{Add, Div, Mul, Neg, Not, Sub};
-
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-pub enum Value {
-    Int(i32),
-    Str(String),
-    Bool(bool),
-    Null,
-}
+use crate::value::Value;
+use std::cmp::Ordering;
 
 #[derive(Debug)]
 pub enum ControlFlow {
@@ -23,14 +14,16 @@ pub enum ControlFlow {
 }
 
 pub struct Interpreter {
-    pub env: HashMap<String, Value>,
+    // pub env: HashMap<String, Value>,
+    pub env: Env,
 }
 
 #[allow(dead_code)]
 impl Interpreter {
     pub fn new() -> Self {
         Self {
-            env: HashMap::new(),
+            // env: HashMap::new(),
+            env: Env::new(),
         }
     }
 
@@ -64,17 +57,21 @@ impl Interpreter {
         match stmt {
             Stmt::Block(stmts) => {
                 // TODO: handle in-loop v. out for return
+
+                // enter scope
+                self.env.push_scope();
+
                 for stmt in stmts {
                     let res = self.eval_stmt(stmt);
-                    match res {
-                        // wlog, a block short circuits on non-none
-                        ControlFlow::Continue => return ControlFlow::Continue,
-                        ControlFlow::Break => return ControlFlow::Break,
-                        ControlFlow::Return(v) => return ControlFlow::Return(v),
-                        ControlFlow::None => {}
+                    // wlog, a block short circuits on non-none
+                    if !matches!(res, ControlFlow::None) {
+                        self.env.pop_scope();
+                        return res;
                     }
                 }
 
+                // pop that smoke lmao
+                self.env.pop_scope();
                 ControlFlow::None
             }
             Stmt::Let(name, expr) => {
@@ -121,18 +118,6 @@ impl Interpreter {
         }
     }
 
-    fn eval_assign(&mut self, name: String, expr: Expr) -> ControlFlow {
-        // make sure var is already defined
-        if self.env.contains_key(&name) {
-            // println!("reassignment {:#?}", expr);
-            self.eval_let(name, expr);
-        } else {
-            // TODO: better error handling
-            panic!("cannot reassign uninitialized variable '{:?}'", name)
-        }
-        ControlFlow::None
-    }
-
     // ifStmt -> "if" "(" expr ")" block ("elif" block)* ("else" block)?
     fn eval_if(
         &mut self,
@@ -166,6 +151,9 @@ impl Interpreter {
     }
 
     fn eval_for(&mut self, init: Box<Stmt>, cond: Expr, step: Box<Stmt>, block: Box<Stmt>) {
+        // enter for scope
+        self.env.push_scope();
+
         // adds init to env
         match *init {
             Stmt::Let(name, expr) => {
@@ -191,11 +179,19 @@ impl Interpreter {
             }
             self.eval_stmt(*step.clone());
         }
+
+        self.env.pop_scope(); // lol pop smoke
     }
 
     fn eval_let(&mut self, name: String, expr: Expr) -> ControlFlow {
         let val = self.eval_expr(expr).unwrap();
-        self.env.insert(name, val);
+        self.env.define(name, val);
+        ControlFlow::None
+    }
+
+    fn eval_assign(&mut self, name: String, expr: Expr) -> ControlFlow {
+        let val = self.eval_expr(expr).unwrap();
+        self.env.assign(name, val).unwrap();
         ControlFlow::None
     }
 
@@ -255,119 +251,6 @@ impl Interpreter {
                 .cloned()
                 .ok_or_else(|| format!("undefined variable '{}'", name)),
             Expr::Group(e) => return self.eval_expr(*e),
-        }
-    }
-}
-
-impl Add for Value {
-    type Output = Result<Value, String>;
-
-    fn add(self, other: Value) -> Self::Output {
-        match (self, other) {
-            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a + b)),
-            (Value::Str(a), Value::Str(b)) => Ok(Value::Str(a + b.as_str())),
-            _ => Err("type mismatch".into()),
-        }
-    }
-}
-
-impl Sub for Value {
-    type Output = Result<Value, String>;
-    fn sub(self, other: Value) -> Self::Output {
-        match (self, other) {
-            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a - b)),
-            _ => Err("type mismatch".into()),
-        }
-    }
-}
-
-impl Neg for Value {
-    type Output = Result<Value, String>;
-
-    fn neg(self) -> Self::Output {
-        match self {
-            Value::Int(a) => Ok(Value::Int(-a)),
-            _ => Err("type mismatch".into()),
-        }
-    }
-}
-
-impl Not for Value {
-    type Output = Result<Value, String>;
-
-    fn not(self) -> Self::Output {
-        match self {
-            Value::Str(_) | Value::Int(_) => Ok(Value::Bool(self.is_truthy())),
-            Value::Bool(val) => Ok(Value::Bool(!val)),
-            Value::Null => Err("cannot evaluate not for void".into()),
-        }
-    }
-}
-
-impl Div for Value {
-    type Output = Result<Value, String>;
-
-    fn div(self, other: Value) -> Self::Output {
-        match (self, other) {
-            (Value::Int(a), Value::Int(b)) => {
-                if b == 0 {
-                    Err("cannot divide by zero".into())
-                } else {
-                    Ok(Value::Int(a / b))
-                }
-            }
-            _ => Err("type mismatch".into()),
-        }
-    }
-}
-
-impl Mul for Value {
-    type Output = Result<Value, String>;
-
-    fn mul(self, other: Value) -> Self::Output {
-        match (self, other) {
-            (Value::Str(s), Value::Int(n)) | (Value::Int(n), Value::Str(s)) => {
-                if n < 0 {
-                    return Err("cannot multiply string by a negative integer".into());
-                }
-
-                Ok(Value::Str(s.repeat(n as usize)))
-            }
-            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a * b)),
-            _ => Err("type mismatch".into()),
-        }
-    }
-}
-
-impl PartialEq for Value {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Value::Int(a), Value::Int(b)) => a == b,
-            (Value::Str(a), Value::Str(b)) => a == b,
-            (Value::Bool(a), Value::Bool(b)) => a == b,
-            _ => false,
-        }
-    }
-}
-
-impl PartialOrd for Value {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        match (self, other) {
-            (Value::Int(a), Value::Int(b)) => a.partial_cmp(b),
-            (Value::Str(a), Value::Str(b)) => a.partial_cmp(b),
-            (Value::Bool(a), Value::Bool(b)) => a.partial_cmp(b),
-            _ => None,
-        }
-    }
-}
-
-impl Value {
-    pub fn is_truthy(&self) -> bool {
-        match self {
-            Value::Int(n) => !(*n == 0),
-            Value::Bool(b) => *b,
-            Value::Str(s) => !s.is_empty(),
-            Value::Null => false,
         }
     }
 }

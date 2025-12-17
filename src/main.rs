@@ -24,7 +24,10 @@ fn main() {
 
     let mut interpreter = Interpreter::new();
     interpreter.run(src);
-    interpreter.env.iter().for_each(|(k, v)| {
-        println!("{}: {:?}", k, v);
-    });
+
+    for scope in &interpreter.env.scopes {
+        for (k, v) in scope {
+            println!("{}: {:?}", k, v);
+        }
+    }
 }
