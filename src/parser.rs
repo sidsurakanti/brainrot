@@ -8,7 +8,12 @@ pub enum Stmt {
     Block(Vec<Stmt>),
     Let(String, Expr),
     While(Expr, Box<Stmt>),
-    For(Box<Stmt>, Expr, Expr, Box<Stmt>),
+    For {
+        init: Box<Stmt>, // let
+        cond: Expr,
+        step: Box<Stmt>,
+        block: Box<Stmt>,
+    },
     Fn(String, Vec<Expr>, Box<Stmt>),
     If {
         cond: Expr,
@@ -101,14 +106,9 @@ impl Parser {
                 match self.at(1).kind {
                     // assignStmt -> IDENT "=" expr
                     TokenType::Assign => {
-                        // consume ident
-                        let name = self.next().lexeme;
-
-                        self.expect(TokenType::Assign, "expected '='")?;
-                        let expr = self.parse_expr()?;
-                        self.expect(TokenType::Semicolon, "expected ';' after continue")?;
-
-                        Stmt::Assignment(name, expr)
+                        let ret = self.parse_assign()?;
+                        self.expect(TokenType::Semicolon, "expected ';' after assignment")?;
+                        ret
                     }
                     // callStmt -> IDENT "(" params? ")"
                     TokenType::LParen => {
@@ -159,6 +159,17 @@ impl Parser {
         };
 
         Ok(statement)
+    }
+
+    // assignStmt -> IDENT "=" expr
+    fn parse_assign(&mut self) -> Result<Stmt, String> {
+        // consume ident
+        let name = self.next().lexeme;
+
+        self.expect(TokenType::Assign, "expected '='")?;
+        let expr = self.parse_expr()?;
+
+        Ok(Stmt::Assignment(name, expr))
     }
 
     // block -> "{" statement* "}"
@@ -243,18 +254,42 @@ impl Parser {
 
         self.expect(TokenType::LParen, "expected '(' after for")?;
 
-        let init: Stmt = self.parse_let()?;
+        // init expr or skip
+        let init: Stmt = match self.peek().kind {
+            TokenType::Let => self.parse_let()?,
+            TokenType::Semicolon => Stmt::Expr(Expr::Null),
+            _ => {
+                return Err(format!(
+                    "unexpected error while parsing init in for loop, found {:?} expected ';'",
+                    self.peek().kind,
+                ));
+            }
+        };
 
         let cond: Expr = self.parse_expr()?;
         self.expect(TokenType::Semicolon, "expected ';' after end condition")?;
 
-        let step: Expr = self.parse_expr()?;
+        let step: Stmt = match self.peek().kind {
+            TokenType::Identifier => self.parse_assign()?,
+            TokenType::RParen => Stmt::Expr(Expr::Null),
+            _ => {
+                return Err(format!(
+                    "unexpected error while parsing step in for loop, found {:?} expected ')'",
+                    self.peek().kind,
+                ));
+            }
+        };
 
         self.expect(TokenType::RParen, "expected ')' after condition")?;
 
         let block: Stmt = self.parse_block()?;
 
-        Ok(Stmt::For(Box::new(init), cond, step, Box::new(block)))
+        Ok(Stmt::For {
+            init: Box::new(init),
+            cond,
+            step: Box::new(step),
+            block: Box::new(block),
+        })
     }
 
     // ifStmt -> "if" "(" expr ")" block ("elif" block)* ("else" block)?

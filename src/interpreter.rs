@@ -89,6 +89,16 @@ impl Interpreter {
                 self.eval_while(cond, block);
                 ControlFlow::None
             }
+
+            Stmt::For {
+                init,
+                cond,
+                step,
+                block,
+            } => {
+                self.eval_for(init, cond, step, block);
+                ControlFlow::None
+            }
             Stmt::Return(expr) => {
                 if let Some(e) = expr {
                     let ret = self.eval_expr(e).unwrap();
@@ -99,27 +109,28 @@ impl Interpreter {
             }
             Stmt::Continue => ControlFlow::Continue,
             Stmt::Break => ControlFlow::Break,
-            Stmt::Assignment(name, expr) => {
-                // make sure var is already defined
-                if self.env.contains_key(&name) {
-                    // println!("reassignment {:#?}", expr);
-                    self.eval_let(name, expr);
-                } else {
-                    // TODO: better errors
-                    panic!("cannot reassign uninitialized variable '{:?}'", name)
-                }
-                ControlFlow::None
-            }
+            Stmt::Assignment(name, expr) => self.eval_assign(name, expr),
             Stmt::If {
                 cond,
                 then_branch,
                 else_branch,
             } => self.eval_if(cond, then_branch, else_branch),
 
-            // Stmt::For(init, cond, step, block) => self.eval_for(init, cond, step, block),
             // Stmt::Call(name, args) => self.eval_call(name, args),
             _ => panic!("unimplemented: {:?}", stmt),
         }
+    }
+
+    fn eval_assign(&mut self, name: String, expr: Expr) -> ControlFlow {
+        // make sure var is already defined
+        if self.env.contains_key(&name) {
+            // println!("reassignment {:#?}", expr);
+            self.eval_let(name, expr);
+        } else {
+            // TODO: better error handling
+            panic!("cannot reassign uninitialized variable '{:?}'", name)
+        }
+        ControlFlow::None
     }
 
     // ifStmt -> "if" "(" expr ")" block ("elif" block)* ("else" block)?
@@ -134,9 +145,8 @@ impl Interpreter {
         if self.eval_expr(cond.clone()).unwrap().is_truthy() {
             self.eval_stmt(*block.clone())
         } else {
-            // else_block == Stmt::If || None
+            // else_block is of type Stmt::If or None
             if let Some(else_block) = else_branch {
-                // else_block is of type Stmt::If or None
                 self.eval_stmt(*else_block)
             } else {
                 ControlFlow::None
@@ -155,9 +165,35 @@ impl Interpreter {
         }
     }
 
-    fn eval_let(&mut self, name: String, expr: Expr) {
+    fn eval_for(&mut self, init: Box<Stmt>, cond: Expr, step: Box<Stmt>, block: Box<Stmt>) {
+        // adds init to env
+        match *init {
+            Stmt::Let(name, expr) => {
+                self.eval_let(name, expr);
+            }
+            // precondition expr == Expr::Null
+            Stmt::Expr(_) => {}
+            _ => {
+                panic!("unexpected stmt inside for loop: should be init")
+            }
+        };
+
+        while self.eval_expr(cond.clone()).unwrap().is_truthy() {
+            match self.eval_stmt(*block.clone()) {
+                ControlFlow::Continue => continue,
+                ControlFlow::Break => break,
+                ControlFlow::None => {}
+                ControlFlow::Return(_) => panic!("unexpected return inside loop"),
+            }
+
+            self.eval_stmt(*step.clone());
+        }
+    }
+
+    fn eval_let(&mut self, name: String, expr: Expr) -> ControlFlow {
         let val = self.eval_expr(expr).unwrap();
         self.env.insert(name, val);
+        ControlFlow::None
     }
 
     fn eval_expr(&mut self, expr: Expr) -> Result<Value, String> {

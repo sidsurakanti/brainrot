@@ -1,12 +1,8 @@
-mod interpreter;
-mod lexer;
-mod parser;
-mod token;
-
-use crate::interpreter::Interpreter;
-use crate::lexer::Lexer;
-use crate::parser::{Parser, Stmt};
 use std::fs;
+
+use brainrot::interpreter::Interpreter;
+use brainrot::lexer::Lexer;
+use brainrot::parser::{Parser, Stmt};
 
 #[allow(dead_code)]
 fn main() {
@@ -14,7 +10,7 @@ fn main() {
 
     let mut lxr = Lexer::new(src.clone());
     let tokens = lxr.tokenize();
-    println!("{:#?}", tokens);
+    // println!("{:#?}", tokens);
 
     let mut parser = Parser::new(tokens);
     let ast: Vec<Stmt> = match parser.parse() {
@@ -25,7 +21,7 @@ fn main() {
         }
     };
 
-    println!("{:#?}", ast);
+    // println!("{:#?}", ast);
 
     let mut interpreter = Interpreter::new();
 

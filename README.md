@@ -28,9 +28,6 @@ if (d < 10) {
 ```
 ```javascript
 // output
-a: Bool(true)
-b: Bool(true)
-c: Bool(false)
 d: Int(12)
 ````
 

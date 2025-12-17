@@ -4,37 +4,44 @@ let b = (1 + 2) * 3; // expect 9
 let c = -a; // expect -7
 let d = a + b + c; // expect 7 + 9 - 7 = 9
 let e = "ha" * 3; // expect "hahaha"
-let s = "hi";
+let s = "hi"; // expect "hi"
 let f = "hello " + "world"; // expect "hello world"
 
-// %%%%%% if statements %%%%%
-let d = 13;
+// %%%% comparisions %%%
+let a = true;
+let b = false;
+let c = a == "2"; // expect true
+let d = a == b; // expect false
 
-if (d <= 10) {
-  d = d + 1;
-} elif (15 > d) {
-  d = d - 1;
-} elif (d == 15) {
-  d = 0;
+// %%%%%% if statements %%%%%
+let a = 13;
+
+if (a <= 10) {
+  a = a + 1;
+} elif (15 > a) {
+  a = a - 1;
+} elif (a == 15) {
+  a = 0;
 } else {
-  d = d + 20;
+  a = a + 20;
 }
 
 // %%%%%%% while %%%%%%%%%%
 let a = 0;
 while (a <= 10) {
   a = a + 1;
-  break;
+  if (a > 5) {
+    break;
+  }
 }
 
-// %%%% comparisions %%%
-let a = true;
-let b = true;
-let c = a == "2";
 
+// %%%%% for %%%%%%%%%
+let a = 20;
 
-// not implemented 
 for (let i = 0; i < 10; i = i + 1) {
   a = a + 1;
 }
+
+// not implemented 
 print();
