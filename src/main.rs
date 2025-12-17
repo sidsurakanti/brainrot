@@ -13,18 +13,16 @@ fn main() {
     // println!("{:#?}", tokens);
 
     let mut parser = Parser::new(tokens);
-    let ast: Vec<Stmt> = match parser.parse() {
+    let _ast: Vec<Stmt> = match parser.parse() {
         Ok(ast) => ast,
         Err(e) => {
             eprintln!("parser error: {}", e);
             return;
         }
     };
-
-    // println!("{:#?}", ast);
+    // println!("{:#?}", _ast);
 
     let mut interpreter = Interpreter::new();
-
     interpreter.run(src);
     interpreter.env.iter().for_each(|(k, v)| {
         println!("{}: {:?}", k, v);

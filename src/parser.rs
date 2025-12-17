@@ -257,7 +257,10 @@ impl Parser {
         // init expr or skip
         let init: Stmt = match self.peek().kind {
             TokenType::Let => self.parse_let()?,
-            TokenType::Semicolon => Stmt::Expr(Expr::Null),
+            TokenType::Semicolon => {
+                self.next();
+                Stmt::Expr(Expr::Null)
+            }
             _ => {
                 return Err(format!(
                     "unexpected error while parsing init in for loop, found {:?} expected ';'",

@@ -180,12 +180,15 @@ impl Interpreter {
 
         while self.eval_expr(cond.clone()).unwrap().is_truthy() {
             match self.eval_stmt(*block.clone()) {
-                ControlFlow::Continue => continue,
+                ControlFlow::Continue => {
+                    // otherwise we will hit same condition again wo increment
+                    self.eval_stmt(*step.clone());
+                    continue;
+                }
                 ControlFlow::Break => break,
                 ControlFlow::None => {}
                 ControlFlow::Return(_) => panic!("unexpected return inside loop"),
             }
-
             self.eval_stmt(*step.clone());
         }
     }
