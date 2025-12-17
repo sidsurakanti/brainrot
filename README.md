@@ -11,7 +11,7 @@ An interpreted language written in Rust. (active development)
 - `if / elif / else`
 - `while` loops
 - `break`, `continue`, `return`
-- `for` loops (soon)
+- `for` loops 
 - Functions (parsing)
 
 ### Example
@@ -37,8 +37,8 @@ while (a <= 10) {
   a = a + 1;
 }
 ```
-
 ```js
+// output
 a: Int(11)
 ```
 
