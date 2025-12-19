@@ -7,6 +7,7 @@ An interpreted language written in Rust. (active development)
 - String concatination and reptition
 - Boolean literals (`true`, `false`)
 - Comparisions
+- Print
 - Comments (`//`)
 - `if / elif / else`
 - `while` loops

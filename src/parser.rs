@@ -229,7 +229,7 @@ impl Parser {
 
         self.expect(
             TokenType::Semicolon,
-            "expected semicolon after end condition",
+            "expected semicolon after let statement",
         )?;
 
         Ok(Stmt::Let(name, expr))

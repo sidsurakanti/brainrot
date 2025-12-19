@@ -113,9 +113,19 @@ impl Interpreter {
                 else_branch,
             } => self.eval_if(cond, then_branch, else_branch),
 
-            // Stmt::Call(name, args) => self.eval_call(name, args),
+            Stmt::Call(name, args) => self.eval_call(name, args),
             _ => panic!("unimplemented: {:?}", stmt),
         }
+    }
+
+    fn eval_call(&mut self, name: String, args: Vec<Expr>) -> ControlFlow {
+        if name.eq("print") {
+            for expr in args {
+                let val = self.eval_expr(expr).unwrap();
+                println!("{:#?}", val)
+            }
+        }
+        ControlFlow::None
     }
 
     // ifStmt -> "if" "(" expr ")" block ("elif" block)* ("else" block)?
