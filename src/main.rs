@@ -3,6 +3,7 @@ use std::fs;
 use brainrot::interpreter::Interpreter;
 use brainrot::lexer::Lexer;
 use brainrot::parser::Parser;
+use brainrot::repl::Repl;
 
 #[allow(dead_code)]
 fn main() {
@@ -20,15 +21,17 @@ fn main() {
     };
     // println!("{:#?}", _ast);
 
-    let mut interpreter = Interpreter::new();
-    let res = interpreter.run(src);
-    if let Err(e) = res {
-        eprintln!("runtime error: {:?}", e);
-    }
+    let mut _interp = Interpreter::new();
+    // let res = _interp.run(src);
+    // if let Err(e) = res {
+    //     eprintln!("runtime error: {:?}", e);
+    // }
+    //
+    // for scope in &_interp.env.scopes {
+    //     for (k, v) in scope {
+    //         println!("{}: {:?}", k, v);
+    //     }
+    // }
 
-    for scope in &interpreter.env.scopes {
-        for (k, v) in scope {
-            println!("{}: {:?}", k, v);
-        }
-    }
+    Repl::repl();
 }

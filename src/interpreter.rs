@@ -4,6 +4,7 @@ use crate::parser::{Expr, Parser, Stmt};
 use crate::token::TokenType;
 use crate::value::Value;
 use std::cmp::Ordering;
+use std::fmt;
 
 #[derive(Debug)]
 pub enum RuntimeError {
@@ -19,6 +20,14 @@ pub enum LangError {
 impl From<String> for RuntimeError {
     fn from(s: String) -> Self {
         RuntimeError::Message(s)
+    }
+}
+
+impl fmt::Display for RuntimeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RuntimeError::Message(msg) => write!(f, "{msg}"),
+        }
     }
 }
 
