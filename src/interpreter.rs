@@ -6,6 +6,23 @@ use crate::value::Value;
 use std::cmp::Ordering;
 
 #[derive(Debug)]
+pub enum RuntimeError {
+    Message(String),
+}
+
+#[derive(Debug)]
+pub enum LangError {
+    Parse(String),
+    Runtime(RuntimeError),
+}
+
+impl From<String> for RuntimeError {
+    fn from(s: String) -> Self {
+        RuntimeError::Message(s)
+    }
+}
+
+#[derive(Debug)]
 pub enum ControlFlow {
     None,
     Continue,
@@ -14,75 +31,80 @@ pub enum ControlFlow {
 }
 
 pub struct Interpreter {
-    // pub env: HashMap<String, Value>,
     pub env: Env,
 }
 
 #[allow(dead_code)]
 impl Interpreter {
     pub fn new() -> Self {
-        Self {
-            // env: HashMap::new(),
-            env: Env::new(),
-        }
+        Self { env: Env::new() }
     }
 
-    pub fn run(&mut self, src: String) {
+    pub fn run(&mut self, src: String) -> Result<(), LangError> {
         let tokens = Lexer::new(src).tokenize();
-        let res = Parser::new(tokens).parse();
+        let ast = Parser::new(tokens).parse().map_err(LangError::Parse)?;
 
-        let Ok(ast) = res else {
-            let e = res.err().unwrap();
-            return eprintln!("parser error: {:?}", e);
-        };
+        self.eval(ast).map_err(LangError::Runtime)?;
 
-        self.eval(ast);
+        Ok(())
     }
 
-    fn eval(&mut self, ast: Vec<Stmt>) {
+    fn eval(&mut self, ast: Vec<Stmt>) -> Result<(), RuntimeError> {
         for stmt in ast {
             // stmt only valid iff yielding ControlFLow::None at top level
-            let cf = self.eval_stmt(&stmt);
-            if !matches!(cf, ControlFlow::None) {
-                panic!(
-                    "invalid control flow at top level {:?} in statement {:#?}",
-                    cf, stmt
-                )
+            match self.eval_stmt(&stmt)? {
+                ControlFlow::None => {}
+                cf => {
+                    return Err(RuntimeError::Message(format!(
+                        "invalid control flow at top level {:?} in statement {:#?}",
+                        cf, stmt,
+                    )));
+                }
             }
         }
+
+        Ok(())
     }
 
-    fn eval_stmt(&mut self, stmt: &Stmt) -> ControlFlow {
-        match stmt {
-            Stmt::Block(stmts) => {
-                // TODO: handle in-loop v. out for return
+    fn eval_block(&mut self, stmts: &Vec<Stmt>) -> Result<ControlFlow, RuntimeError> {
+        // TODO: handle in-loop v. out for return
 
-                // enter scope
-                self.env.push_scope();
+        // enter scope
+        self.env.push_scope();
 
-                for stmt in stmts {
-                    let res = self.eval_stmt(stmt);
-                    // wlog, a block short circuits on non-none
-                    if !matches!(res, ControlFlow::None) {
-                        self.env.pop_scope();
-                        return res;
-                    }
-                }
-
-                // pop that smoke lmao
+        for stmt in stmts {
+            let res = self.eval_stmt(stmt)?;
+            // wlog, a block short circuits on non-none
+            if !matches!(res, ControlFlow::None) {
                 self.env.pop_scope();
-                ControlFlow::None
+                return Ok(res);
             }
-            Stmt::Let(name, expr) => {
-                self.eval_let(name, expr);
-                ControlFlow::None
-            }
-            Stmt::Expr(expr) => {
-                self.eval_expr(expr).unwrap();
-                ControlFlow::None
-            }
-            Stmt::While(cond, block) => self.eval_while(cond, block),
+        }
 
+        // pop that smoke lmao
+        self.env.pop_scope();
+        Ok(ControlFlow::None)
+    }
+
+    fn eval_stmt(&mut self, stmt: &Stmt) -> Result<ControlFlow, RuntimeError> {
+        match stmt {
+            Stmt::Block(stmts) => self.eval_block(stmts),
+
+            Stmt::Expr(expr) => {
+                self.eval_expr(expr)?;
+                Ok(ControlFlow::None)
+            }
+
+            Stmt::Let(name, expr) => self.eval_let(name, expr),
+            Stmt::Assignment(name, expr) => self.eval_assign(name, expr),
+
+            Stmt::If {
+                cond,
+                then_branch,
+                else_branch,
+            } => self.eval_if(cond, then_branch, else_branch),
+
+            Stmt::While(cond, block) => self.eval_while(cond, block),
             Stmt::For {
                 init,
                 cond,
@@ -90,37 +112,30 @@ impl Interpreter {
                 block,
             } => self.eval_for(init, cond, step, block),
 
+            Stmt::Continue => Ok(ControlFlow::Continue),
+            Stmt::Break => Ok(ControlFlow::Break),
             Stmt::Return(expr) => {
                 if let Some(e) = expr {
-                    let ret = self.eval_expr(e).unwrap();
-                    ControlFlow::Return(ret)
+                    let ret = self.eval_expr(e)?;
+                    Ok(ControlFlow::Return(ret))
                 } else {
-                    ControlFlow::Return(Value::Null)
+                    Ok(ControlFlow::Return(Value::Null))
                 }
             }
 
-            Stmt::Continue => ControlFlow::Continue,
-            Stmt::Break => ControlFlow::Break,
-            Stmt::Assignment(name, expr) => self.eval_assign(name, expr),
-            Stmt::If {
-                cond,
-                then_branch,
-                else_branch,
-            } => self.eval_if(cond, then_branch, else_branch),
-
             Stmt::Call(name, args) => self.eval_call(name, args),
-            _ => panic!("unimplemented: {:?}", stmt),
+            _ => Err(RuntimeError::Message(format!("unimplemented: {:?}", stmt))),
         }
     }
 
-    fn eval_call(&mut self, name: &String, args: &Vec<Expr>) -> ControlFlow {
+    fn eval_call(&mut self, name: &String, args: &Vec<Expr>) -> Result<ControlFlow, RuntimeError> {
         if name.eq("print") {
             for expr in args {
-                let val = self.eval_expr(expr).unwrap();
+                let val = self.eval_expr(expr)?;
                 println!("{:#?}", val)
             }
         }
-        ControlFlow::None
+        Ok(ControlFlow::None)
     }
 
     // ifStmt -> "if" "(" expr ")" block ("elif" block)* ("else" block)?
@@ -129,30 +144,30 @@ impl Interpreter {
         cond: &Expr,
         then_branch: &Box<Stmt>,
         else_branch: &Option<Box<Stmt>>,
-    ) -> ControlFlow {
-        if self.eval_expr(cond).unwrap().is_truthy() {
+    ) -> Result<ControlFlow, RuntimeError> {
+        if self.eval_expr(cond)?.is_truthy() {
             self.eval_stmt(then_branch.as_ref())
         } else {
             // else_block is of type Stmt::If or None
             if let Some(else_block) = else_branch {
                 self.eval_stmt(else_block.as_ref())
             } else {
-                ControlFlow::None
+                Ok(ControlFlow::None)
             }
         }
     }
 
-    fn eval_while(&mut self, cond: &Expr, block: &Box<Stmt>) -> ControlFlow {
-        'outer: while self.eval_expr(cond).unwrap().is_truthy() {
-            match self.eval_stmt(block.as_ref()) {
+    fn eval_while(&mut self, cond: &Expr, block: &Box<Stmt>) -> Result<ControlFlow, RuntimeError> {
+        'outer: while self.eval_expr(cond)?.is_truthy() {
+            match self.eval_stmt(block.as_ref())? {
                 ControlFlow::Continue => continue 'outer,
                 ControlFlow::Break => break 'outer,
                 ControlFlow::None => {}
-                ControlFlow::Return(val) => return ControlFlow::Return(val),
+                ControlFlow::Return(val) => return Ok(ControlFlow::Return(val)),
             }
         }
 
-        ControlFlow::None
+        Ok(ControlFlow::None)
     }
 
     fn eval_for(
@@ -161,52 +176,54 @@ impl Interpreter {
         cond: &Expr,
         step: &Box<Stmt>,
         block: &Box<Stmt>,
-    ) -> ControlFlow {
+    ) -> Result<ControlFlow, RuntimeError> {
         // enter for scope
         self.env.push_scope();
 
         // adds init to env
         match init.as_ref() {
             Stmt::Let(name, expr) => {
-                self.eval_let(name, expr);
+                self.eval_let(name, expr)?;
             }
             // precondition expr == Expr::Null
             Stmt::Expr(_) => {}
             _ => {
-                panic!("unexpected stmt inside for loop: should be init")
+                return Err(RuntimeError::Message(
+                    "unexpected stmt inside for loop: should be init".into(),
+                ));
             }
         };
 
-        while self.eval_expr(cond).unwrap().is_truthy() {
-            match self.eval_stmt(block.as_ref()) {
+        while self.eval_expr(cond)?.is_truthy() {
+            match self.eval_stmt(block.as_ref())? {
                 ControlFlow::Continue => {
                     // otherwise we will hit same condition again wo increment
-                    self.eval_stmt(step.as_ref());
+                    self.eval_stmt(step.as_ref())?;
                     continue;
                 }
                 ControlFlow::Break => break,
                 ControlFlow::None => {}
-                ControlFlow::Return(val) => return ControlFlow::Return(val),
+                ControlFlow::Return(val) => return Ok(ControlFlow::Return(val)),
             }
 
             // NOTE: what if step returns !CF::None
-            self.eval_stmt(step.as_ref());
+            self.eval_stmt(step.as_ref())?;
         }
 
         self.env.pop_scope(); // lol pop smoke
-        ControlFlow::None
+        Ok(ControlFlow::None)
     }
 
-    fn eval_let(&mut self, name: &String, expr: &Expr) -> ControlFlow {
-        let val = self.eval_expr(expr).unwrap();
+    fn eval_let(&mut self, name: &String, expr: &Expr) -> Result<ControlFlow, RuntimeError> {
+        let val = self.eval_expr(expr)?;
         self.env.define(name.clone(), val);
-        ControlFlow::None
+        Ok(ControlFlow::None)
     }
 
-    fn eval_assign(&mut self, name: &String, expr: &Expr) -> ControlFlow {
-        let val = self.eval_expr(expr).unwrap();
-        self.env.assign(name.clone(), val).unwrap();
-        ControlFlow::None
+    fn eval_assign(&mut self, name: &String, expr: &Expr) -> Result<ControlFlow, RuntimeError> {
+        let val = self.eval_expr(expr)?;
+        self.env.assign(name.clone(), val)?;
+        Ok(ControlFlow::None)
     }
 
     fn eval_expr(&mut self, expr: &Expr) -> Result<Value, String> {

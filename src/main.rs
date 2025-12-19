@@ -2,7 +2,7 @@ use std::fs;
 
 use brainrot::interpreter::Interpreter;
 use brainrot::lexer::Lexer;
-use brainrot::parser::{Parser, Stmt};
+use brainrot::parser::Parser;
 
 #[allow(dead_code)]
 fn main() {
@@ -13,17 +13,18 @@ fn main() {
     // println!("{:#?}", tokens);
 
     let mut parser = Parser::new(tokens);
-    let _ast: Vec<Stmt> = match parser.parse() {
-        Ok(ast) => ast,
-        Err(e) => {
-            eprintln!("parser error: {}", e);
-            return;
-        }
+    let res = parser.parse();
+    let Ok(_ast) = res else {
+        eprintln!("parser error: {}", res.unwrap_err());
+        return;
     };
     // println!("{:#?}", _ast);
 
     let mut interpreter = Interpreter::new();
-    interpreter.run(src);
+    let res = interpreter.run(src);
+    if let Err(e) = res {
+        eprintln!("runtime error: {:?}", e);
+    }
 
     for scope in &interpreter.env.scopes {
         for (k, v) in scope {

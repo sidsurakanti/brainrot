@@ -1,25 +1,24 @@
-use brainrot::interpreter::Interpreter;
+use brainrot::interpreter::{Interpreter, LangError};
 use brainrot::value::Value;
 
-// TODO: assert .run().is_ok() after converting errors from panic
-
 #[test]
-fn block_scope_does_not_leak() {
+fn block_scope_does_not_leak() -> Result<(), LangError> {
     let mut i = Interpreter::new();
     i.run(
         r#"
         {
             let x = 10;
         }
-    "#
+        "#
         .into(),
-    );
+    )?;
 
     assert!(i.env.get("x").is_none());
+    Ok(())
 }
 
 #[test]
-fn inner_scope_can_read_outer() {
+fn inner_scope_can_read_outer() -> Result<(), LangError> {
     let mut i = Interpreter::new();
     i.run(
         r#"
@@ -27,15 +26,16 @@ fn inner_scope_can_read_outer() {
         {
             let y = x + 1;
         }
-    "#
+        "#
         .into(),
-    );
+    )?;
 
     assert_eq!(i.env["x"], Value::Int(5));
+    Ok(())
 }
 
 #[test]
-fn inner_scope_can_shadow_outer() {
+fn inner_scope_can_shadow_outer() -> Result<(), LangError> {
     let mut i = Interpreter::new();
     i.run(
         r#"
@@ -43,15 +43,16 @@ fn inner_scope_can_shadow_outer() {
         {
             let x = 2;
         }
-    "#
+        "#
         .into(),
-    );
+    )?;
 
     assert_eq!(i.env["x"], Value::Int(1));
+    Ok(())
 }
 
 #[test]
-fn assignment_updates_nearest_scope() {
+fn assignment_updates_nearest_scope() -> Result<(), LangError> {
     let mut i = Interpreter::new();
     i.run(
         r#"
@@ -59,43 +60,46 @@ fn assignment_updates_nearest_scope() {
         {
             x = 2;
         }
-    "#
+        "#
         .into(),
-    );
+    )?;
 
     assert_eq!(i.env["x"], Value::Int(2));
+    Ok(())
 }
 
 #[test]
-fn for_loop_scope_does_not_leak() {
+fn for_loop_scope_does_not_leak() -> Result<(), LangError> {
     let mut i = Interpreter::new();
     i.run(
         r#"
         for (let i = 0; i < 3; i = i + 1) {
             let x = i;
         }
-    "#
+        "#
         .into(),
-    );
+    )?;
 
     assert!(i.env.get("i").is_none());
     assert!(i.env.get("x").is_none());
+    Ok(())
 }
 
 #[test]
-#[should_panic]
-fn assigning_undefined_variable_panics() {
+fn assigning_undefined_variable_errs() {
     let mut i = Interpreter::new();
-    i.run(
+    let res = i.run(
         r#"
         x = 10;
-    "#
+        "#
         .into(),
     );
+
+    assert!(matches!(res, Err(LangError::Runtime(_))));
 }
 
 #[test]
-fn arithmetic_ops() {
+fn arithmetic_ops() -> Result<(), LangError> {
     let mut i = Interpreter::new();
     i.run(
         r#"
@@ -106,9 +110,9 @@ fn arithmetic_ops() {
         let e = "ho" * 3;
         let s = "hi";
         let f = "hello " + "world";
-    "#
+        "#
         .into(),
-    );
+    )?;
 
     assert_eq!(i.env["a"], Value::Int(7));
     assert_eq!(i.env["b"], Value::Int(9));
@@ -117,24 +121,26 @@ fn arithmetic_ops() {
     assert_eq!(i.env["e"], Value::Str("hohoho".into()));
     assert_eq!(i.env["s"], Value::Str("hi".into()));
     assert_eq!(i.env["f"], Value::Str("hello world".into()));
+    Ok(())
 }
 
 #[test]
-fn assignment() {
+fn assignment() -> Result<(), LangError> {
     let mut i = Interpreter::new();
     i.run(
         r#"
         let a = 0;
         a = 1;
-    "#
+        "#
         .into(),
-    );
+    )?;
 
     assert_eq!(i.env["a"], Value::Int(1));
+    Ok(())
 }
 
 #[test]
-fn comparisons() {
+fn comparisons() -> Result<(), LangError> {
     let mut i = Interpreter::new();
     i.run(
         r#"
@@ -142,16 +148,17 @@ fn comparisons() {
         let b = false;
         let c = a == "2";
         let d = a == b;
-    "#
+        "#
         .into(),
-    );
+    )?;
 
     assert_eq!(i.env["c"], Value::Bool(false));
     assert_eq!(i.env["d"], Value::Bool(false));
+    Ok(())
 }
 
 #[test]
-fn if_elif_else() {
+fn if_elif_else() -> Result<(), LangError> {
     let mut i = Interpreter::new();
     i.run(
         r#"
@@ -166,15 +173,16 @@ fn if_elif_else() {
         } else {
             a = a + 20;
         }
-    "#
+        "#
         .into(),
-    );
+    )?;
 
     assert_eq!(i.env["a"], Value::Int(12));
+    Ok(())
 }
 
 #[test]
-fn while_break() {
+fn while_break() -> Result<(), LangError> {
     let mut i = Interpreter::new();
     i.run(
         r#"
@@ -185,15 +193,16 @@ fn while_break() {
                 break;
             }
         }
-    "#
+        "#
         .into(),
-    );
+    )?;
 
     assert_eq!(i.env["a"], Value::Int(6));
+    Ok(())
 }
 
 #[test]
-fn for_basic_increment() {
+fn for_basic_increment() -> Result<(), LangError> {
     let mut i = Interpreter::new();
     i.run(
         r#"
@@ -203,14 +212,14 @@ fn for_basic_increment() {
         }
         "#
         .into(),
-    );
+    )?;
 
-    // 0 + 1 + 2 + 3 + 4
     assert_eq!(i.env["sum"], Value::Int(10));
+    Ok(())
 }
 
 #[test]
-fn for_without_init() {
+fn for_without_init() -> Result<(), LangError> {
     let mut i = Interpreter::new();
     i.run(
         r#"
@@ -222,13 +231,14 @@ fn for_without_init() {
         }
         "#
         .into(),
-    );
+    )?;
 
     assert_eq!(i.env["sum"], Value::Int(10));
+    Ok(())
 }
 
 #[test]
-fn for_without_step() {
+fn for_without_step() -> Result<(), LangError> {
     let mut i = Interpreter::new();
     i.run(
         r#"
@@ -244,13 +254,14 @@ fn for_without_step() {
         }
         "#
         .into(),
-    );
+    )?;
 
     assert_eq!(i.env["i"], Value::Int(3));
+    Ok(())
 }
 
 #[test]
-fn for_with_break() {
+fn for_with_break() -> Result<(), LangError> {
     let mut i = Interpreter::new();
     i.run(
         r#"
@@ -263,13 +274,14 @@ fn for_with_break() {
         }
         "#
         .into(),
-    );
+    )?;
 
     assert_eq!(i.env["i"], Value::Int(3));
+    Ok(())
 }
 
 #[test]
-fn for_with_continue() {
+fn for_with_continue() -> Result<(), LangError> {
     let mut i = Interpreter::new();
     i.run(
         r#"
@@ -283,14 +295,14 @@ fn for_with_continue() {
         }
         "#
         .into(),
-    );
+    )?;
 
-    // skips 2 → 0 + 1 + 3 + 4
     assert_eq!(i.env["sum"], Value::Int(8));
+    Ok(())
 }
 
 #[test]
-fn nested_for_loops() {
+fn nested_for_loops() -> Result<(), LangError> {
     let mut i = Interpreter::new();
     i.run(
         r#"
@@ -302,7 +314,8 @@ fn nested_for_loops() {
         }
         "#
         .into(),
-    );
+    )?;
 
     assert_eq!(i.env["count"], Value::Int(6));
+    Ok(())
 }
