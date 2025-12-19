@@ -42,18 +42,17 @@ impl Interpreter {
     fn eval(&mut self, ast: Vec<Stmt>) {
         for stmt in ast {
             // stmt only valid iff yielding ControlFLow::None at top level
-            let cf = self.eval_stmt(stmt.clone());
+            let cf = self.eval_stmt(&stmt);
             if !matches!(cf, ControlFlow::None) {
                 panic!(
                     "invalid control flow at top level {:?} in statement {:#?}",
-                    cf,
-                    stmt.clone()
+                    cf, stmt
                 )
             }
         }
     }
 
-    fn eval_stmt(&mut self, stmt: Stmt) -> ControlFlow {
+    fn eval_stmt(&mut self, stmt: &Stmt) -> ControlFlow {
         match stmt {
             Stmt::Block(stmts) => {
                 // TODO: handle in-loop v. out for return
@@ -82,20 +81,15 @@ impl Interpreter {
                 self.eval_expr(expr).unwrap();
                 ControlFlow::None
             }
-            Stmt::While(cond, block) => {
-                self.eval_while(cond, block);
-                ControlFlow::None
-            }
+            Stmt::While(cond, block) => self.eval_while(cond, block),
 
             Stmt::For {
                 init,
                 cond,
                 step,
                 block,
-            } => {
-                self.eval_for(init, cond, step, block);
-                ControlFlow::None
-            }
+            } => self.eval_for(init, cond, step, block),
+
             Stmt::Return(expr) => {
                 if let Some(e) = expr {
                     let ret = self.eval_expr(e).unwrap();
@@ -104,6 +98,7 @@ impl Interpreter {
                     ControlFlow::Return(Value::Null)
                 }
             }
+
             Stmt::Continue => ControlFlow::Continue,
             Stmt::Break => ControlFlow::Break,
             Stmt::Assignment(name, expr) => self.eval_assign(name, expr),
@@ -118,7 +113,7 @@ impl Interpreter {
         }
     }
 
-    fn eval_call(&mut self, name: String, args: Vec<Expr>) -> ControlFlow {
+    fn eval_call(&mut self, name: &String, args: &Vec<Expr>) -> ControlFlow {
         if name.eq("print") {
             for expr in args {
                 let val = self.eval_expr(expr).unwrap();
@@ -131,41 +126,47 @@ impl Interpreter {
     // ifStmt -> "if" "(" expr ")" block ("elif" block)* ("else" block)?
     fn eval_if(
         &mut self,
-        cond: Expr,
-        then_branch: Box<Stmt>,
-        else_branch: Option<Box<Stmt>>,
+        cond: &Expr,
+        then_branch: &Box<Stmt>,
+        else_branch: &Option<Box<Stmt>>,
     ) -> ControlFlow {
-        let block = then_branch; // Stmt::Block
-
-        if self.eval_expr(cond.clone()).unwrap().is_truthy() {
-            self.eval_stmt(*block.clone())
+        if self.eval_expr(cond).unwrap().is_truthy() {
+            self.eval_stmt(then_branch.as_ref())
         } else {
             // else_block is of type Stmt::If or None
             if let Some(else_block) = else_branch {
-                self.eval_stmt(*else_block)
+                self.eval_stmt(else_block.as_ref())
             } else {
                 ControlFlow::None
             }
         }
     }
 
-    fn eval_while(&mut self, cond: Expr, block: Box<Stmt>) {
-        'outer: while self.eval_expr(cond.clone()).unwrap().is_truthy() {
-            match self.eval_stmt(*block.clone()) {
+    fn eval_while(&mut self, cond: &Expr, block: &Box<Stmt>) -> ControlFlow {
+        'outer: while self.eval_expr(cond).unwrap().is_truthy() {
+            match self.eval_stmt(block.as_ref()) {
                 ControlFlow::Continue => continue 'outer,
                 ControlFlow::Break => break 'outer,
                 ControlFlow::None => {}
-                ControlFlow::Return(_) => panic!("unexpected return inside loop"),
+                ControlFlow::Return(val) => return ControlFlow::Return(val),
             }
         }
+
+        ControlFlow::None
     }
 
-    fn eval_for(&mut self, init: Box<Stmt>, cond: Expr, step: Box<Stmt>, block: Box<Stmt>) {
+    fn eval_for(
+        &mut self,
+        init: &Box<Stmt>,
+        cond: &Expr,
+        step: &Box<Stmt>,
+        block: &Box<Stmt>,
+    ) -> ControlFlow {
         // enter for scope
         self.env.push_scope();
 
         // adds init to env
-        match *init {
+        match init.as_ref() {
             Stmt::Let(name, expr) => {
                 self.eval_let(name, expr);
             }
@@ -176,40 +177,43 @@ impl Interpreter {
             }
         };
 
-        while self.eval_expr(cond.clone()).unwrap().is_truthy() {
-            match self.eval_stmt(*block.clone()) {
+        while self.eval_expr(cond).unwrap().is_truthy() {
+            match self.eval_stmt(block.as_ref()) {
                 ControlFlow::Continue => {
                     // otherwise we will hit same condition again wo increment
-                    self.eval_stmt(*step.clone());
+                    self.eval_stmt(step.as_ref());
                     continue;
                 }
                 ControlFlow::Break => break,
                 ControlFlow::None => {}
-                ControlFlow::Return(_) => panic!("unexpected return inside loop"),
+                ControlFlow::Return(val) => return ControlFlow::Return(val),
             }
-            self.eval_stmt(*step.clone());
+
+            // NOTE: what if step returns !CF::None
+            self.eval_stmt(step.as_ref());
         }
 
         self.env.pop_scope(); // lol pop smoke
-    }
-
-    fn eval_let(&mut self, name: String, expr: Expr) -> ControlFlow {
-        let val = self.eval_expr(expr).unwrap();
-        self.env.define(name, val);
         ControlFlow::None
     }
 
-    fn eval_assign(&mut self, name: String, expr: Expr) -> ControlFlow {
+    fn eval_let(&mut self, name: &String, expr: &Expr) -> ControlFlow {
         let val = self.eval_expr(expr).unwrap();
-        self.env.assign(name, val).unwrap();
+        self.env.define(name.clone(), val);
         ControlFlow::None
     }
 
-    fn eval_expr(&mut self, expr: Expr) -> Result<Value, String> {
+    fn eval_assign(&mut self, name: &String, expr: &Expr) -> ControlFlow {
+        let val = self.eval_expr(expr).unwrap();
+        self.env.assign(name.clone(), val).unwrap();
+        ControlFlow::None
+    }
+
+    fn eval_expr(&mut self, expr: &Expr) -> Result<Value, String> {
         match expr {
             Expr::Binary(left, op, right) => {
-                let l = self.eval_expr(*left)?;
-                let r = self.eval_expr(*right)?;
+                let l = self.eval_expr(left.as_ref())?;
+                let r = self.eval_expr(right.as_ref())?;
 
                 // TODO: these will be infix op's but js make sure or smth idk
                 match op {
@@ -243,7 +247,7 @@ impl Interpreter {
                 }
             }
             Expr::Unary(op, right) => {
-                let val = self.eval_expr(*right)?;
+                let val = self.eval_expr(right.as_ref())?;
 
                 match op {
                     TokenType::Minus => -val,
@@ -251,16 +255,16 @@ impl Interpreter {
                     _ => return Err("unimplemented".into()),
                 }
             }
-            Expr::Number(val) => Ok(Value::Int(val)),
-            Expr::String(val) => Ok(Value::Str(val)),
-            Expr::Bool(b) => Ok(Value::Bool(b)),
+            Expr::Number(val) => Ok(Value::Int(val.clone())),
+            Expr::String(val) => Ok(Value::Str(val.clone())),
+            Expr::Bool(b) => Ok(Value::Bool(b.clone())),
             Expr::Null => Ok(Value::Null),
             Expr::Ident(name) => self
                 .env
-                .get(&name)
+                .get(name)
                 .cloned()
                 .ok_or_else(|| format!("undefined variable '{}'", name)),
-            Expr::Group(e) => return self.eval_expr(*e),
+            Expr::Group(e) => self.eval_expr(e.as_ref()),
         }
     }
 }

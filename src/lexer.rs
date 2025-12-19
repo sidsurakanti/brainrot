@@ -7,9 +7,9 @@ pub struct Lexer {
 }
 
 impl Lexer {
-    pub fn new(src: String) -> Lexer {
+    pub fn new(src: String) -> Self {
         let chars = src.chars().collect();
-        Lexer { src, chars, pos: 0 }
+        Self { src, chars, pos: 0 }
     }
 
     pub fn tokenize(&mut self) -> Vec<Token> {
