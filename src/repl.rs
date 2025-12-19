@@ -11,9 +11,10 @@ impl Repl {
         let mut depth = 0;
         let mut saw_semicolon = true;
         let mut in_string = false;
+        let mut saw_empty_line = false;
         let mut buff = String::new();
 
-        println!("[BRAINROT] REPL\n<Ctrl-C> to quit.");
+        println!("{}", "[BRAINROT] REPL\n<Ctrl-C> to quit.".purple().bold());
         // write to buff until ; or {}
         // don't bother increasing depth on {} found in strings
         loop {
@@ -43,6 +44,17 @@ impl Repl {
                     ';' if !in_string => saw_semicolon = true,
                     _ => {}
                 }
+            }
+
+            // reset on two empty lines
+            if line.trim().len() == 0 {
+                if saw_empty_line {
+                    depth = 0;
+                    saw_semicolon = true;
+                    in_string = false;
+                    continue;
+                }
+                saw_empty_line = true;
             }
 
             buff.push_str(&line);

@@ -1,4 +1,5 @@
 use std::cmp::{PartialEq, PartialOrd};
+use std::fmt;
 use std::ops::{Add, Div, Mul, Neg, Not, Sub};
 
 #[derive(Debug, Clone)]
@@ -10,6 +11,16 @@ pub enum Value {
     Null,
 }
 
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Value::Int(n) => write!(f, "{}", n),
+            Value::Str(s) => write!(f, "{}", s),
+            Value::Bool(b) => write!(f, "{}", b),
+            Value::Null => write!(f, "null"),
+        }
+    }
+}
 impl Add for Value {
     type Output = Result<Value, String>;
 

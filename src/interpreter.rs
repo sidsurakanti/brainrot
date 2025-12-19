@@ -3,6 +3,7 @@ use crate::lexer::Lexer;
 use crate::parser::{Expr, Parser, Stmt};
 use crate::token::TokenType;
 use crate::value::Value;
+use colored::*;
 use std::cmp::Ordering;
 use std::fmt;
 
@@ -141,7 +142,13 @@ impl Interpreter {
         if name.eq("print") {
             for expr in args {
                 let val = self.eval_expr(expr)?;
-                println!("{:#?}", val)
+
+                match val {
+                    Value::Int(_) => println!("{}", val.to_string().cyan()),
+                    Value::Str(_) => println!("{}", val.to_string().green()),
+                    Value::Bool(_) => println!("{}", val.to_string().yellow()),
+                    Value::Null => println!("{}", "null".dimmed()),
+                }
             }
         }
         Ok(ControlFlow::None)
@@ -242,6 +249,7 @@ impl Interpreter {
                 let r = self.eval_expr(right.as_ref())?;
 
                 // TODO: these will be infix op's but js make sure or smth idk
+                // TODO:: modulo
                 match op {
                     TokenType::Plus => l + r,
                     TokenType::Minus => l - r,

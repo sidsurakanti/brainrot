@@ -10,7 +10,7 @@ let f = "hello " + "world"; // expect "hello world"
 // %%%% comparisions %%%
 let a = true;
 let b = false;
-let c = a == "2"; // expect true
+let c = a == "2"; // expect false
 let d = a == b; // expect false
 
 // %%%%%% if statements %%%%%
