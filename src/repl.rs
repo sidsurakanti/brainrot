@@ -57,10 +57,11 @@ impl Repl {
                 saw_empty_line = true;
             }
 
-            buff.push_str(&line);
+            buff.push_str(&line.trim());
 
             if depth == 0 && saw_semicolon {
                 // eval buff
+                // println!("{}", buff);
                 let res = interp.run(buff.clone());
                 if let Err(e) = res {
                     eprintln!("{:?}", e);
