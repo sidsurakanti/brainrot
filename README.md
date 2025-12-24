@@ -17,13 +17,13 @@ An interpreted language written in Rust. (active development)
 - Functions (wip)
 
 ### Usage
-```bash
+```zsh
 git clone https://github.com/sidsurakanti/brainrot.git
 cd brainrot
 cargo build
 cargo run
 ```
-```bash
+```rust
 [BRAINROT] REPL
 <Ctrl-C> to quit.
 >>> print("hello, world!");
@@ -34,7 +34,7 @@ hello, world!
 >>> print(10 * 30 + (2 / 2));
 301
 ```
-```bash
+```rs
 >>> let a = true;
 >>> let b = false;
 >>> print(a == b);
@@ -44,7 +44,7 @@ true
 >>> print(a == "2");
 false
 ```
-```sh
+```rs
 >>> let a = 0;
 >>> while (a <= 10) {
 ...     a = a + 1;
@@ -57,7 +57,7 @@ false
 >>> print(a);
 6
 ```
-```sh
+```rs
 >>> let a = 0;
 >>> for (let i = 0; i < 10; i = i + 1) {
 ...     a = a + 1;
@@ -67,7 +67,7 @@ false
 >>> print(a);
 10
 ```
-```sh
+```rs
 >>> let a = 13;
 >>> if (a <= 10) {
 ...     a = a + 1;
