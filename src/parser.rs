@@ -14,7 +14,11 @@ pub enum Stmt {
         step: Box<Stmt>,
         block: Box<Stmt>,
     },
-    Fn(String, Vec<Expr>, Box<Stmt>),
+    Fn {
+        name: String,
+        args: Vec<Expr>,
+        block: Box<Stmt>,
+    },
     If {
         cond: Expr,
         then_branch: Box<Stmt>, // Stmt::Block
@@ -101,7 +105,8 @@ impl Parser {
 
             TokenType::If => self.parse_if()?,
 
-            // TokenType::Fn => self.parse_fn()?,
+            TokenType::Fn => self.parse_fn()?,
+
             TokenType::Identifier => {
                 match self.at(1).kind {
                     // assignStmt -> IDENT "=" expr
@@ -159,6 +164,47 @@ impl Parser {
         };
 
         Ok(statement)
+    }
+
+    // fnDecl -> "fn" IDENT "(" (IDENT ("," IDENT)*)? ")" block
+    fn parse_fn(&mut self) -> Result<Stmt, String> {
+        self.next(); // ::fn
+
+        let name = self.next().lexeme;
+
+        self.expect(TokenType::LParen, "expected '(' after fn definition")?;
+
+        let mut args: Vec<Expr> = vec![];
+
+        if self.check(TokenType::RParen) {
+            self.next();
+        } else {
+            // must be ident
+            if self.check(TokenType::Identifier) {
+                args.push(self.parse_expr()?);
+            } else {
+                return Err("func arg names can only be identifiers".into());
+            }
+
+            while !matches!(self.peek().kind, TokenType::RParen) {
+                self.expect(TokenType::Comma, "expected ',' between args")?;
+                if self.check(TokenType::Identifier) {
+                    args.push(self.parse_expr()?);
+                } else {
+                    return Err("func arg names can only be identifiers".into());
+                }
+            }
+
+            self.expect(TokenType::RParen, "expected ')' after args")?;
+        }
+
+        let block = self.parse_block()?;
+
+        Ok(Stmt::Fn {
+            name,
+            args,
+            block: Box::new(block),
+        })
     }
 
     // assignStmt -> IDENT "=" expr

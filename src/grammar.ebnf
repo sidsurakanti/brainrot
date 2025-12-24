@@ -9,7 +9,7 @@ assignStmt -> IDENT "=" exprStmt
 ifStmt -> "if" "(" expr ")" block ("elif" block)* ("else" block)?
 whileStmt -> "while" "(" expr ")" block
 forStmt -> "for" "(" letStmt expr ";" expr ")" bloc
-fnDecl -> "fn" IDENT "(" params? ")" block
+fnDecl -> "fn" IDENT "(" (IDENT ("," IDENT)*)? ")" block
 callStmt -> IDENT "(" params? ")"
 
 expr -> equality
