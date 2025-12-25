@@ -1,6 +1,6 @@
 use std::cmp::{PartialEq, PartialOrd};
 use std::fmt;
-use std::ops::{Add, Div, Mul, Neg, Not, Sub};
+use std::ops::{Add, Div, Mul, Neg, Not, Rem, Sub};
 
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
@@ -39,6 +39,17 @@ impl Sub for Value {
         match (self, other) {
             (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a - b)),
             _ => Err("type mismatch".into()),
+        }
+    }
+}
+
+impl Rem for Value {
+    type Output = Result<Value, String>;
+
+    fn rem(self, other: Value) -> Self::Output {
+        match (self, other) {
+            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a % b)),
+            _ => Err("module not implemented for this type".into()),
         }
     }
 }

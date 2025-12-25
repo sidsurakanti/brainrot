@@ -255,6 +255,7 @@ impl Interpreter {
                     TokenType::Minus => l - r,
                     TokenType::Times => l * r,
                     TokenType::Divide => l / r,
+                    TokenType::Modulo => l % r,
                     TokenType::Less => {
                         let res = l.partial_cmp(&r);
                         let b = matches!(res, Some(Ordering::Less));
