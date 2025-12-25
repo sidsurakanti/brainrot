@@ -248,8 +248,6 @@ impl Interpreter {
                 let l = self.eval_expr(left.as_ref())?;
                 let r = self.eval_expr(right.as_ref())?;
 
-                // TODO: these will be infix op's but js make sure or smth idk
-                // TODO:: modulo
                 match op {
                     TokenType::Plus => l + r,
                     TokenType::Minus => l - r,

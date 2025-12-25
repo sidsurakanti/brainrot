@@ -9,6 +9,11 @@ pub enum TokenType {
 
     // operators
     Assign,
+    PlusEqual,
+    MinusEqual,
+    TimesEqual,
+    DivEqual,
+    ModuloEqual,
 
     // arithmetic
     Plus,

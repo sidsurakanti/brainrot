@@ -110,7 +110,12 @@ impl Parser {
             TokenType::Identifier => {
                 match self.at(1).kind {
                     // assignStmt -> IDENT "=" expr
-                    TokenType::Assign => {
+                    TokenType::Assign
+                    | TokenType::PlusEqual
+                    | TokenType::MinusEqual
+                    | TokenType::TimesEqual
+                    | TokenType::DivEqual
+                    | TokenType::ModuloEqual => {
                         let ret = self.parse_assign()?;
                         self.expect(TokenType::Semicolon, "expected ';' after assignment")?;
                         ret
@@ -212,10 +217,29 @@ impl Parser {
         // consume ident
         let name = self.next().lexeme;
 
-        self.expect(TokenType::Assign, "expected '='")?;
-        let expr = self.parse_expr()?;
+        let assign_op: Option<TokenType> = match self.peek().kind {
+            TokenType::PlusEqual => Some(TokenType::Plus),
+            TokenType::MinusEqual => Some(TokenType::Minus),
+            TokenType::TimesEqual => Some(TokenType::Times),
+            TokenType::DivEqual => Some(TokenType::Divide),
+            TokenType::ModuloEqual => Some(TokenType::Modulo),
+            _ => {
+                self.expect(TokenType::Assign, "expected assignment")?;
+                None
+            }
+        };
 
-        Ok(Stmt::Assignment(name, expr))
+        if let Some(op) = assign_op {
+            self.next(); // consume op
+            let expr = self.parse_expr()?;
+            Ok(Stmt::Assignment(
+                name.clone(),
+                Expr::Binary(Box::new(Expr::Ident(name)), op, Box::new(expr)),
+            ))
+        } else {
+            let expr = self.parse_expr()?;
+            Ok(Stmt::Assignment(name, expr))
+        }
     }
 
     // block -> "{" statement* "}"

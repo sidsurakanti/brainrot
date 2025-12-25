@@ -109,3 +109,61 @@ fn parses_nested_blocks() {
         panic!("nested block parse failed");
     }
 }
+
+#[test]
+fn parses_plus_equal() {
+    let ast = parse("a += 3;");
+    if let Stmt::Assignment(name, Expr::Binary(lhs, TokenType::Plus, rhs)) = &ast[0] {
+        assert_eq!(name, "a");
+        assert!(matches!(**lhs, Expr::Ident(_)));
+        assert!(matches!(**rhs, Expr::Number(3)));
+    } else {
+        panic!("+= not parsed correctly");
+    }
+}
+
+#[test]
+fn parses_minus_equal() {
+    let ast = parse("a -= 1;");
+    assert!(matches!(
+        ast[0],
+        Stmt::Assignment(_, Expr::Binary(_, TokenType::Minus, _))
+    ));
+}
+
+#[test]
+fn parses_times_equal() {
+    let ast = parse("a *= 2;");
+    assert!(matches!(
+        ast[0],
+        Stmt::Assignment(_, Expr::Binary(_, TokenType::Times, _))
+    ));
+}
+
+#[test]
+fn parses_divide_equal() {
+    let ast = parse("a /= 4;");
+    assert!(matches!(
+        ast[0],
+        Stmt::Assignment(_, Expr::Binary(_, TokenType::Divide, _))
+    ));
+}
+
+#[test]
+fn parses_modulo_equal() {
+    let ast = parse("a %= 5;");
+    assert!(matches!(
+        ast[0],
+        Stmt::Assignment(_, Expr::Binary(_, TokenType::Modulo, _))
+    ));
+}
+
+#[test]
+fn compound_assignment_desugars_correctly() {
+    let ast = parse("x += y * 2;");
+    if let Stmt::Assignment(_, Expr::Binary(_, TokenType::Plus, rhs)) = &ast[0] {
+        assert!(matches!(**rhs, Expr::Binary(_, TokenType::Times, _)));
+    } else {
+        panic!("compound assignment desugaring broken");
+    }
+}

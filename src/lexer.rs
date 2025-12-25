@@ -81,6 +81,11 @@ impl Lexer {
 
     fn try_two_char(&mut self, ch: char) -> Option<TokenType> {
         match (ch, self.peek_n(1)) {
+            ('+', Some('=')) => Some(TokenType::PlusEqual),
+            ('-', Some('=')) => Some(TokenType::MinusEqual),
+            ('*', Some('=')) => Some(TokenType::TimesEqual),
+            ('/', Some('=')) => Some(TokenType::DivEqual),
+            ('%', Some('=')) => Some(TokenType::ModuloEqual),
             ('<', Some('=')) => Some(TokenType::LessEqual),
             ('>', Some('=')) => Some(TokenType::GreaterEqual),
             ('=', Some('=')) => Some(TokenType::EqualEqual),

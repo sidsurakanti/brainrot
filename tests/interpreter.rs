@@ -110,6 +110,7 @@ fn arithmetic_ops() -> Result<(), LangError> {
         let e = "ho" * 3;
         let s = "hi";
         let f = "hello " + "world";
+        let g = 1 + 2 * 3 + 4 / 5 - 6 % 7; // should be 1
         "#
         .into(),
     )?;
@@ -121,6 +122,7 @@ fn arithmetic_ops() -> Result<(), LangError> {
     assert_eq!(i.env["e"], Value::Str("hohoho".into()));
     assert_eq!(i.env["s"], Value::Str("hi".into()));
     assert_eq!(i.env["f"], Value::Str("hello world".into()));
+    assert_eq!(i.env["g"], Value::Int(1));
     Ok(())
 }
 
