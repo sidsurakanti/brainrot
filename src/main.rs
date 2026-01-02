@@ -11,7 +11,7 @@ fn main() {
 
     let mut lxr = Lexer::new(src.clone());
     let tokens = lxr.tokenize();
-    dbg!(&tokens);
+    // dbg!(&tokens);
 
     let mut parser = Parser::new(tokens);
     let res = parser.parse();
@@ -19,18 +19,17 @@ fn main() {
         eprintln!("parser error: {}", res.unwrap_err());
         return;
     };
-    dbg!(_ast);
+    // dbg!(_ast);
 
     let mut _interp = Interpreter::new();
-    let res = _interp.run(src);
-    if let Err(e) = res {
-        eprintln!("runtime error: {:?}", e);
-    }
+    // let res = _interp.run(src);
+    // if let Err(e) = res {
+    //     eprintln!("runtime error: {:?}", e);
+    // }
 
-    // for scope in &_interp.env.scopes {
-    //     for (k, v) in scope {
-    //         println!("{}: {:?}", k, v);
-    //     }
+    // _interp.env_dump();
+    // if let Some(p) = _interp.get("x") {
+    //     println!("{}", p);
     // }
 
     Repl::repl();

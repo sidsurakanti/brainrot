@@ -97,7 +97,7 @@ fn parses_for_loop() {
 #[test]
 fn parses_function_call() {
     let ast = parse("foo(1, 2, 3);");
-    assert!(matches!(ast[0], Stmt::Call(_, _)));
+    assert!(matches!(ast[0], Stmt::Expr(Expr::Callable { .. })));
 }
 
 #[test]

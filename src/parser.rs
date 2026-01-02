@@ -25,7 +25,6 @@ pub enum Stmt {
         else_branch: Option<Box<Stmt>>,
     },
     Expr(Expr),
-    Call(String, Vec<Expr>),
     Assignment(String, Expr),
     Return(Option<Expr>),
     Continue,
@@ -43,6 +42,7 @@ pub enum Expr {
     Group(Box<Expr>),
     Bool(bool),
     Null,
+    Callable { name: Box<Expr>, args: Vec<Expr> },
 }
 
 // lexer.tokenize() -> Vec<Token> ->
@@ -121,15 +121,14 @@ impl Parser {
                         ret
                     }
                     // callStmt -> IDENT "(" params? ")"
-                    TokenType::LParen => {
-                        let name = token.lexeme.clone();
-                        self.next(); // consume ident
-
-                        let args: Vec<Expr> = self.parse_args()?;
-                        self.expect(TokenType::Semicolon, "expected ';' after expression")?;
-                        Stmt::Call(name, args)
-                    }
-                    // expr
+                    // TokenType::LParen => {
+                    //     let name = token.lexeme.clone();
+                    //     self.next(); // consume ident
+                    //
+                    //     let args: Vec<Expr> = self.parse_args()?;
+                    //     self.expect(TokenType::Semicolon, "expected ';' after expression")?;
+                    //     Stmt::Call(name, args)
+                    // }
                     _ => {
                         let expr = self.parse_expr()?;
                         self.expect(TokenType::Semicolon, "expected ';' after expression")?;
@@ -433,6 +432,19 @@ impl Parser {
         // println!("{:?}", lhs);
 
         loop {
+            // parse postfix
+            if matches!(self.peek().kind, TokenType::LParen) {
+                let args: Vec<Expr> = self.parse_args()?;
+
+                // we will verify that this callable is valid when eval'ing
+                // for now we just pass any nud
+                lhs = Expr::Callable {
+                    name: Box::new(lhs),
+                    args,
+                };
+                continue;
+            }
+
             // lhs <op>, else ignore curr token and break
             // we let parent's handle other tokens
             let op = match self.peek().kind.clone() {

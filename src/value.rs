@@ -1,4 +1,5 @@
 use crate::env::Env;
+use crate::interpreter::RuntimeError;
 use crate::parser::Stmt;
 use std::cell::RefCell;
 use std::cmp::{PartialEq, PartialOrd};
@@ -33,93 +34,95 @@ impl fmt::Display for Value {
     }
 }
 impl Add for Value {
-    type Output = Result<Value, String>;
+    type Output = Result<Value, RuntimeError>;
 
     fn add(self, other: Value) -> Self::Output {
         match (self, other) {
             (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a + b)),
-            (Value::Str(a), Value::Str(b)) => Ok(Value::Str(a + b.as_str())),
-            _ => Err("type mismatch".into()),
+            (Value::Str(a), Value::Str(b)) => Ok(Value::Str(a + &b)),
+            _ => Err(RuntimeError::type_mismatch()),
         }
     }
 }
 
 impl Sub for Value {
-    type Output = Result<Value, String>;
+    type Output = Result<Value, RuntimeError>;
+
     fn sub(self, other: Value) -> Self::Output {
         match (self, other) {
             (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a - b)),
-            _ => Err("type mismatch".into()),
-        }
-    }
-}
-
-impl Rem for Value {
-    type Output = Result<Value, String>;
-
-    fn rem(self, other: Value) -> Self::Output {
-        match (self, other) {
-            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a % b)),
-            _ => Err("module not implemented for this type".into()),
-        }
-    }
-}
-
-impl Neg for Value {
-    type Output = Result<Value, String>;
-
-    fn neg(self) -> Self::Output {
-        match self {
-            Value::Int(a) => Ok(Value::Int(-a)),
-            _ => Err("type mismatch".into()),
-        }
-    }
-}
-
-impl Not for Value {
-    type Output = Result<Value, String>;
-
-    fn not(self) -> Self::Output {
-        match self {
-            Value::Str(_) | Value::Int(_) => Ok(Value::Bool(self.is_truthy())),
-            Value::Bool(val) => Ok(Value::Bool(!val)),
-            Value::Null => Err("cannot evaluate not for void".into()),
-            Value::Fn { .. } => Err("cannot evaluate not for fn".into()),
-        }
-    }
-}
-
-impl Div for Value {
-    type Output = Result<Value, String>;
-
-    fn div(self, other: Value) -> Self::Output {
-        match (self, other) {
-            (Value::Int(a), Value::Int(b)) => {
-                if b == 0 {
-                    Err("cannot divide by zero".into())
-                } else {
-                    Ok(Value::Int(a / b))
-                }
-            }
-            _ => Err("type mismatch".into()),
+            _ => Err(RuntimeError::type_mismatch()),
         }
     }
 }
 
 impl Mul for Value {
-    type Output = Result<Value, String>;
+    type Output = Result<Value, RuntimeError>;
 
     fn mul(self, other: Value) -> Self::Output {
         match (self, other) {
             (Value::Str(s), Value::Int(n)) | (Value::Int(n), Value::Str(s)) => {
                 if n < 0 {
-                    return Err("cannot multiply string by a negative integer".into());
+                    Err(RuntimeError::Message(
+                        "cannot multiply string by negative integer".into(),
+                    ))
+                } else {
+                    Ok(Value::Str(s.repeat(n as usize)))
                 }
-
-                Ok(Value::Str(s.repeat(n as usize)))
             }
             (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a * b)),
-            _ => Err("type mismatch".into()),
+            _ => Err(RuntimeError::type_mismatch()),
+        }
+    }
+}
+
+impl Div for Value {
+    type Output = Result<Value, RuntimeError>;
+
+    fn div(self, other: Value) -> Self::Output {
+        match (self, other) {
+            (Value::Int(_), Value::Int(0)) => {
+                Err(RuntimeError::Message("cannot divide by zero".into()))
+            }
+            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a / b)),
+            _ => Err(RuntimeError::type_mismatch()),
+        }
+    }
+}
+
+impl Rem for Value {
+    type Output = Result<Value, RuntimeError>;
+
+    fn rem(self, other: Value) -> Self::Output {
+        match (self, other) {
+            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a % b)),
+            _ => Err(RuntimeError::Message(
+                "modulo not implemented for this type".into(),
+            )),
+        }
+    }
+}
+
+impl Neg for Value {
+    type Output = Result<Value, RuntimeError>;
+
+    fn neg(self) -> Self::Output {
+        match self {
+            Value::Int(a) => Ok(Value::Int(-a)),
+            _ => Err(RuntimeError::type_mismatch()),
+        }
+    }
+}
+
+impl Not for Value {
+    type Output = Result<Value, RuntimeError>;
+
+    fn not(self) -> Self::Output {
+        match self {
+            Value::Bool(b) => Ok(Value::Bool(!b)),
+            Value::Int(_) | Value::Str(_) => Ok(Value::Bool(self.is_truthy())),
+            Value::Null => Err(RuntimeError::Message("cannot apply '!' to null".into())),
+            Value::Fn { .. } => Err(RuntimeError::Message("cannot apply '!' to function".into())),
         }
     }
 }

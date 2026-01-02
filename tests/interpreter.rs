@@ -557,3 +557,25 @@ fn function_return_basic() -> Result<(), LangError> {
     assert_eq!(i.get("x").unwrap(), Value::Int(5));
     Ok(())
 }
+
+#[test]
+fn recursion_factorial() -> Result<(), LangError> {
+    let mut i = Interpreter::new();
+
+    i.run(
+        r#"
+        fn fact(n) {
+            if (n <= 1) {
+                return 1;
+            }
+            return n * fact(n - 1);
+        }
+
+        let x = fact(5);
+        "#
+        .into(),
+    )?;
+
+    assert_eq!(i.get("x").unwrap(), Value::Int(120));
+    Ok(())
+}

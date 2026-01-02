@@ -14,6 +14,12 @@ pub enum RuntimeError {
     Message(String),
 }
 
+impl RuntimeError {
+    pub fn type_mismatch() -> Self {
+        RuntimeError::Message("type mismatch".into())
+    }
+}
+
 #[derive(Debug)]
 pub enum LangError {
     Parse(String),
@@ -139,9 +145,6 @@ impl Interpreter {
 
                 Ok(ControlFlow::None)
             }
-
-            Stmt::Call(name, args) => self.eval_call(name, args),
-            // _ => Err(RuntimeError::Message(format!("unimplemented: {:?}", stmt))),
         }
     }
 
@@ -164,7 +167,7 @@ impl Interpreter {
         Ok(ControlFlow::None)
     }
 
-    fn eval_call(&mut self, name: &String, args: &Vec<Expr>) -> Result<ControlFlow, RuntimeError> {
+    fn eval_call(&mut self, name: &String, args: &Vec<Expr>) -> Result<Value, RuntimeError> {
         let vals: Vec<Value> = args
             .iter()
             .map(|arg| self.eval_expr(arg))
@@ -181,7 +184,7 @@ impl Interpreter {
                     Value::Fn { .. } => println!("{}", val),
                 }
             }
-            return Ok(ControlFlow::None);
+            return Ok(Value::Null);
         }
 
         let func = self
@@ -222,14 +225,26 @@ impl Interpreter {
                 self.curr_env = calling_env;
 
                 match res {
-                    Ok(cf) => return Ok(cf),
+                    Ok(cf) => {
+                        return {
+                            // cf::none => block success w no return
+                            // cf::ret => handle
+                            // cf::continue | break => loops should catch it
+                            // otherwise err
+                            match cf {
+                                ControlFlow::Return(val) => Ok(val),
+                                ControlFlow::None => Ok(Value::Null),
+                                _ => Err(RuntimeError::Message(
+                                    "expected return or null after function body".to_string(),
+                                )),
+                            }
+                        };
+                    }
                     Err(e) => return Err(e),
                 }
             }
             _ => panic!(), // should never get here
         }
-
-        // Ok(ControlFlow::None)
     }
 
     // ifStmt -> "if" "(" expr ")" block ("elif" block)* ("else" block)?
@@ -322,7 +337,7 @@ impl Interpreter {
         Ok(ControlFlow::None)
     }
 
-    fn eval_expr(&mut self, expr: &Expr) -> Result<Value, String> {
+    fn eval_expr(&mut self, expr: &Expr) -> Result<Value, RuntimeError> {
         match expr {
             Expr::Binary(left, op, right) => {
                 let l = self.eval_expr(left.as_ref())?;
@@ -356,26 +371,50 @@ impl Interpreter {
                     }
                     TokenType::EqualEqual => Ok(Value::Bool(l == r)),
                     TokenType::NotEqual => Ok(Value::Bool(l != r)),
-                    _ => return Err(format!("unimplemented {:?}", op)),
+                    _ => Err(RuntimeError::Message(format!(
+                        "unimplemented binary operator {:?}",
+                        op
+                    ))),
                 }
             }
+
             Expr::Unary(op, right) => {
                 let val = self.eval_expr(right.as_ref())?;
 
                 match op {
                     TokenType::Minus => -val,
                     TokenType::Bang => !val,
-                    _ => return Err("unimplemented".into()),
+                    _ => Err(RuntimeError::Message(format!(
+                        "unimplemented unary operator {:?}",
+                        op
+                    ))),
                 }
             }
+
             Expr::Number(val) => Ok(Value::Int(val.clone())),
             Expr::String(val) => Ok(Value::Str(val.clone())),
-            Expr::Bool(b) => Ok(Value::Bool(b.clone())),
+            Expr::Bool(b) => Ok(Value::Bool(*b)),
             Expr::Null => Ok(Value::Null),
+
             Expr::Ident(name) => self
                 .get(name)
-                .ok_or_else(|| format!("undefined variable '{}'", name)),
+                .ok_or_else(|| RuntimeError::Message(format!("undefined variable '{}'", name))),
+
             Expr::Group(e) => self.eval_expr(e.as_ref()),
+
+            Expr::Callable { name, args } => {
+                let name = match name.as_ref() {
+                    Expr::Ident(s) => s,
+                    _ => {
+                        return Err(RuntimeError::Message(
+                            "expected callable to be identifier".into(),
+                        ));
+                    }
+                };
+
+                let res = self.eval_call(name, args)?;
+                Ok(res)
+            }
         }
     }
 
