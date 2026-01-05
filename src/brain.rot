@@ -1,3 +1,8 @@
-// a = 20;
+let x = 2;
 
-fn test(x, y) {}
+while (x < 10) {
+  let i = 10;
+  x += 1;
+}
+
+print(x);

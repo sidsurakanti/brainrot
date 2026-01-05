@@ -1,66 +1,76 @@
 use crate::value::Value;
+use std::cell::RefCell;
 use std::collections::HashMap;
-use std::ops::Index;
+use std::rc::Rc;
 
+type EnvRef = Rc<RefCell<Env>>;
+
+#[derive(Debug)]
 pub struct Env {
-    pub scopes: Vec<HashMap<String, Value>>,
+    pub(crate) parent: Option<EnvRef>,
+    bucket: HashMap<String, Value>,
 }
 
 impl Env {
-    pub fn new() -> Env {
+    pub fn new(parent: Option<EnvRef>) -> Env {
         return Self {
-            scopes: vec![HashMap::new()],
+            parent: parent,
+            bucket: HashMap::new(),
         };
     }
 
-    pub fn push_scope(&mut self) {
-        let scope: HashMap<String, Value> = HashMap::new();
-        self.scopes.push(scope);
+    pub fn push_scope(parent: &EnvRef) -> EnvRef {
+        // prev <- new, ret new
+        Rc::new(RefCell::new(Env::new(Some(Rc::clone(parent)))))
     }
 
-    // sounds like pop smoke lmao
-    pub fn pop_scope(&mut self) {
-        if self.scopes.len() > 1 {
-            self.scopes.pop();
-        }
-    }
+    pub fn get(head: EnvRef, key: &str) -> Option<Value> {
+        // search from curr node until parent == None
+        let mut curr = head;
 
-    pub fn get(&self, key: &str) -> Option<&Value> {
-        // search from top of stack to bottom to find var
-        for scope in self.scopes.iter().rev() {
-            if let Some(v) = scope.get(key) {
-                return Some(v);
+        loop {
+            let parent = {
+                let env = curr.borrow();
+
+                // search
+                if let Some(v) = env.bucket.get(key) {
+                    return Some(v.clone());
+                }
+
+                env.parent.clone()
+            };
+
+            match parent {
+                Some(next) => curr = next,
+                None => return None,
             }
         }
-
-        None
     }
 
-    pub fn define(&mut self, key: String, val: Value) {
-        // search from top of stack to bottom to find var
-        if let Some(curr_scope) = self.scopes.last_mut() {
-            curr_scope.insert(key, val);
-        }
+    pub fn define(start: EnvRef, key: String, val: Value) {
+        let mut env = start.borrow_mut();
+        env.bucket.insert(key.clone(), val.clone());
     }
 
-    pub fn assign(&mut self, key: String, val: Value) -> Result<(), String> {
-        // search from top of stack to bottom to find var
-        for scope in self.scopes.iter_mut().rev() {
-            if let Some(_) = scope.get(&key) {
-                scope.insert(key, val);
-                return Ok(());
+    pub fn assign(start: EnvRef, key: String, val: Value) -> Result<(), String> {
+        let mut curr = start;
+
+        loop {
+            let parent = {
+                let mut env = curr.borrow_mut();
+
+                if let Some(_) = env.bucket.get(&key) {
+                    env.bucket.insert(key, val);
+                    return Ok(());
+                }
+
+                env.parent.clone()
+            };
+
+            match parent {
+                Some(p) => curr = p,
+                None => return Err("cannot reassign value to undefined variable".into()),
             }
         }
-
-        Err("cannot reassign value to undefined variable".into())
-    }
-}
-
-impl Index<&str> for Env {
-    type Output = Value;
-
-    fn index(&self, key: &str) -> &Self::Output {
-        self.get(key)
-            .unwrap_or_else(|| panic!("undefined variable '{}'", key))
     }
 }

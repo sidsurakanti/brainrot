@@ -1,26 +1,38 @@
 program -> statement* EOF
 
-statement -> block | letStmt | ifStmt | whileStmt | forStmt | fnDecl | exprStmt | callStmt
+statement -> block 
+              | letStmt 
+              | ifStmt 
+              | whileStmt 
+              | forStmt 
+              | fnDecl 
+              | exprStmt 
+              | callStmt
+              | assignStmt
 
 block -> "{" statement* "}"
 exprStmt -> expr ";"
 letStmt -> "let" IDENT "=" expr ";"
-assignStmt -> IDENT "=" exprStmt
-ifStmt -> "if" "(" expr ")" block ("elif" block)* ("else" block)?
+assignStmt -> IDENT assignOp expr ";"
+ifStmt -> "if" "(" expr ")" block 
+          ("elif" "(" expr ")" block)* 
+          ("else" block)?
 whileStmt -> "while" "(" expr ")" block
-forStmt -> "for" "(" letStmt expr ";" expr ")" bloc
+forStmt -> "for" "(" forInit? ";" expr? ";" expr? ")" block
 fnDecl -> "fn" IDENT "(" (IDENT ("," IDENT)*)? ")" block
-callStmt -> IDENT "(" params? ")"
 
-expr -> equality
+forInit -> "let" IDENT "=" expr
+assignOp -> "=" | "+=" | "-=" | "/=" | "*=" | "%="
+
+expr -> logic_or
+logic_or -> logic_and ("or" logic_and)*
+logic_and -> comparision ("and" comparision)*
 equality -> comparison (("!=" | "==") comparison)*
 comparison -> term ((">" | "<" | ">=" | "<=") term)*
-term -> factor ("+" | "-") factor
-factor -> unary ("*" | "/") unary
-unary -> "-" unary | "!" unary | primary
+term -> factor (("+" | "-") factor)*
+factor -> unary (("*" | "/") unary)*
+unary -> "-" unary | "!" unary | postfix
+postfix -> primary ( "(" params ")" )*
 primary -> IDENT | NUMBER | STRING | "(" expr ")"
 
-params -> "(" (expr ("," expr)*)? ")"
-
-
-
+params -> (expr ("," expr)*)?

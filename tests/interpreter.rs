@@ -13,7 +13,7 @@ fn block_scope_does_not_leak() -> Result<(), LangError> {
         .into(),
     )?;
 
-    assert!(i.env.get("x").is_none());
+    assert!(i.get("x").is_none());
     Ok(())
 }
 
@@ -30,7 +30,7 @@ fn inner_scope_can_read_outer() -> Result<(), LangError> {
         .into(),
     )?;
 
-    assert_eq!(i.env["x"], Value::Int(5));
+    assert_eq!(i.get("x").unwrap(), Value::Int(5));
     Ok(())
 }
 
@@ -47,7 +47,7 @@ fn inner_scope_can_shadow_outer() -> Result<(), LangError> {
         .into(),
     )?;
 
-    assert_eq!(i.env["x"], Value::Int(1));
+    assert_eq!(i.get("x").unwrap(), Value::Int(1));
     Ok(())
 }
 
@@ -64,7 +64,7 @@ fn assignment_updates_nearest_scope() -> Result<(), LangError> {
         .into(),
     )?;
 
-    assert_eq!(i.env["x"], Value::Int(2));
+    assert_eq!(i.get("x").unwrap(), Value::Int(2));
     Ok(())
 }
 
@@ -80,8 +80,8 @@ fn for_loop_scope_does_not_leak() -> Result<(), LangError> {
         .into(),
     )?;
 
-    assert!(i.env.get("i").is_none());
-    assert!(i.env.get("x").is_none());
+    assert!(i.get("i").is_none());
+    assert!(i.get("x").is_none());
     Ok(())
 }
 
@@ -115,14 +115,14 @@ fn arithmetic_ops() -> Result<(), LangError> {
         .into(),
     )?;
 
-    assert_eq!(i.env["a"], Value::Int(7));
-    assert_eq!(i.env["b"], Value::Int(9));
-    assert_eq!(i.env["c"], Value::Int(-7));
-    assert_eq!(i.env["d"], Value::Int(9));
-    assert_eq!(i.env["e"], Value::Str("hohoho".into()));
-    assert_eq!(i.env["s"], Value::Str("hi".into()));
-    assert_eq!(i.env["f"], Value::Str("hello world".into()));
-    assert_eq!(i.env["g"], Value::Int(1));
+    assert_eq!(i.get("a").unwrap(), Value::Int(7));
+    assert_eq!(i.get("b").unwrap(), Value::Int(9));
+    assert_eq!(i.get("c").unwrap(), Value::Int(-7));
+    assert_eq!(i.get("d").unwrap(), Value::Int(9));
+    assert_eq!(i.get("e").unwrap(), Value::Str("hohoho".into()));
+    assert_eq!(i.get("s").unwrap(), Value::Str("hi".into()));
+    assert_eq!(i.get("f").unwrap(), Value::Str("hello world".into()));
+    assert_eq!(i.get("g").unwrap(), Value::Int(1));
     Ok(())
 }
 
@@ -137,7 +137,7 @@ fn assignment() -> Result<(), LangError> {
         .into(),
     )?;
 
-    assert_eq!(i.env["a"], Value::Int(1));
+    assert_eq!(i.get("a").unwrap(), Value::Int(1));
     Ok(())
 }
 
@@ -154,8 +154,8 @@ fn comparisons() -> Result<(), LangError> {
         .into(),
     )?;
 
-    assert_eq!(i.env["c"], Value::Bool(false));
-    assert_eq!(i.env["d"], Value::Bool(false));
+    assert_eq!(i.get("c").unwrap(), Value::Bool(false));
+    assert_eq!(i.get("d").unwrap(), Value::Bool(false));
     Ok(())
 }
 
@@ -179,7 +179,7 @@ fn if_elif_else() -> Result<(), LangError> {
         .into(),
     )?;
 
-    assert_eq!(i.env["a"], Value::Int(12));
+    assert_eq!(i.get("a").unwrap(), Value::Int(12));
     Ok(())
 }
 
@@ -199,7 +199,7 @@ fn while_break() -> Result<(), LangError> {
         .into(),
     )?;
 
-    assert_eq!(i.env["a"], Value::Int(6));
+    assert_eq!(i.get("a").unwrap(), Value::Int(6));
     Ok(())
 }
 
@@ -216,7 +216,7 @@ fn for_basic_increment() -> Result<(), LangError> {
         .into(),
     )?;
 
-    assert_eq!(i.env["sum"], Value::Int(10));
+    assert_eq!(i.get("sum").unwrap(), Value::Int(10));
     Ok(())
 }
 
@@ -235,7 +235,7 @@ fn for_without_init() -> Result<(), LangError> {
         .into(),
     )?;
 
-    assert_eq!(i.env["sum"], Value::Int(10));
+    assert_eq!(i.get("sum").unwrap(), Value::Int(10));
     Ok(())
 }
 
@@ -258,7 +258,7 @@ fn for_without_step() -> Result<(), LangError> {
         .into(),
     )?;
 
-    assert_eq!(i.env["i"], Value::Int(3));
+    assert_eq!(i.get("i").unwrap(), Value::Int(3));
     Ok(())
 }
 
@@ -278,7 +278,7 @@ fn for_with_break() -> Result<(), LangError> {
         .into(),
     )?;
 
-    assert_eq!(i.env["i"], Value::Int(3));
+    assert_eq!(i.get("i").unwrap(), Value::Int(3));
     Ok(())
 }
 
@@ -299,7 +299,7 @@ fn for_with_continue() -> Result<(), LangError> {
         .into(),
     )?;
 
-    assert_eq!(i.env["sum"], Value::Int(8));
+    assert_eq!(i.get("sum").unwrap(), Value::Int(8));
     Ok(())
 }
 
@@ -318,6 +318,6 @@ fn nested_for_loops() -> Result<(), LangError> {
         .into(),
     )?;
 
-    assert_eq!(i.env["count"], Value::Int(6));
+    assert_eq!(i.get("count").unwrap(), Value::Int(6));
     Ok(())
 }

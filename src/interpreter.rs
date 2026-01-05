@@ -4,8 +4,10 @@ use crate::parser::{Expr, Parser, Stmt};
 use crate::token::TokenType;
 use crate::value::Value;
 use colored::*;
+use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fmt;
+use std::rc::Rc;
 
 #[derive(Debug)]
 pub enum RuntimeError {
@@ -40,14 +42,22 @@ pub enum ControlFlow {
     Return(Value),
 }
 
+type EnvRef = Rc<RefCell<Env>>;
+
 pub struct Interpreter {
-    pub env: Env,
+    pub curr_env: EnvRef,
+    pub global: EnvRef,
 }
 
-#[allow(dead_code)]
+#[allow(dead_code, unused_variables)]
 impl Interpreter {
     pub fn new() -> Self {
-        Self { env: Env::new() }
+        let g = Rc::new(RefCell::new(Env::new(None)));
+
+        Self {
+            curr_env: Rc::clone(&g),
+            global: Rc::clone(&g),
+        }
     }
 
     pub fn run(&mut self, src: String) -> Result<(), LangError> {
@@ -71,29 +81,11 @@ impl Interpreter {
                     )));
                 }
             }
+
+            // self.env_dump();
         }
 
         Ok(())
-    }
-
-    fn eval_block(&mut self, stmts: &Vec<Stmt>) -> Result<ControlFlow, RuntimeError> {
-        // TODO: handle in-loop v. out for return
-
-        // enter scope
-        self.env.push_scope();
-
-        for stmt in stmts {
-            let res = self.eval_stmt(stmt)?;
-            // wlog, a block short circuits on non-none
-            if !matches!(res, ControlFlow::None) {
-                self.env.pop_scope();
-                return Ok(res);
-            }
-        }
-
-        // pop that smoke lmao
-        self.env.pop_scope();
-        Ok(ControlFlow::None)
     }
 
     fn eval_stmt(&mut self, stmt: &Stmt) -> Result<ControlFlow, RuntimeError> {
@@ -133,9 +125,43 @@ impl Interpreter {
                 }
             }
 
+            Stmt::Fn { name, args, block } => {
+                // add func to env values
+                // define params
+                // save block and a copy of defining env
+                //
+                // on call
+                // push new env stack
+                // bind args to params
+                // push env copy
+                // return ret value
+                // todo!();
+
+                Ok(ControlFlow::None)
+            }
+
             Stmt::Call(name, args) => self.eval_call(name, args),
-            _ => Err(RuntimeError::Message(format!("unimplemented: {:?}", stmt))),
+            // _ => Err(RuntimeError::Message(format!("unimplemented: {:?}", stmt))),
         }
+    }
+
+    fn eval_block(&mut self, stmts: &Vec<Stmt>) -> Result<ControlFlow, RuntimeError> {
+        // enter scope
+        let prev = Rc::clone(&self.curr_env);
+        self.curr_env = Env::push_scope(&self.curr_env);
+
+        for stmt in stmts {
+            let res = self.eval_stmt(stmt)?;
+            // wlog, a block short circuits on non-none
+            if !matches!(res, ControlFlow::None) {
+                self.curr_env = prev;
+                return Ok(res);
+            }
+        }
+
+        // pop that smoke lmao
+        self.curr_env = prev; // temp env gets dropped rc--
+        Ok(ControlFlow::None)
     }
 
     fn eval_call(&mut self, name: &String, args: &Vec<Expr>) -> Result<ControlFlow, RuntimeError> {
@@ -194,7 +220,8 @@ impl Interpreter {
         block: &Box<Stmt>,
     ) -> Result<ControlFlow, RuntimeError> {
         // enter for scope
-        self.env.push_scope();
+        let prev = Rc::clone(&self.curr_env);
+        self.curr_env = Env::push_scope(&self.curr_env);
 
         // adds init to env
         match init.as_ref() {
@@ -226,19 +253,20 @@ impl Interpreter {
             self.eval_stmt(step.as_ref())?;
         }
 
-        self.env.pop_scope(); // lol pop smoke
+        self.curr_env = prev;
         Ok(ControlFlow::None)
     }
 
     fn eval_let(&mut self, name: &String, expr: &Expr) -> Result<ControlFlow, RuntimeError> {
         let val = self.eval_expr(expr)?;
-        self.env.define(name.clone(), val);
+        // println!("{}: {}", name, val);
+        Env::define(Rc::clone(&self.curr_env), name.clone(), val);
         Ok(ControlFlow::None)
     }
 
     fn eval_assign(&mut self, name: &String, expr: &Expr) -> Result<ControlFlow, RuntimeError> {
         let val = self.eval_expr(expr)?;
-        self.env.assign(name.clone(), val)?;
+        Env::assign(Rc::clone(&self.curr_env), name.clone(), val)?;
         Ok(ControlFlow::None)
     }
 
@@ -293,11 +321,30 @@ impl Interpreter {
             Expr::Bool(b) => Ok(Value::Bool(b.clone())),
             Expr::Null => Ok(Value::Null),
             Expr::Ident(name) => self
-                .env
                 .get(name)
-                .cloned()
                 .ok_or_else(|| format!("undefined variable '{}'", name)),
             Expr::Group(e) => self.eval_expr(e.as_ref()),
+        }
+    }
+
+    pub fn get(&self, name: &str) -> Option<Value> {
+        Env::get(Rc::clone(&self.curr_env), name)
+    }
+
+    pub fn env_dump(&self) {
+        let mut curr = Rc::clone(&self.curr_env);
+
+        loop {
+            let parent = {
+                let env = curr.borrow();
+                dbg!(&env);
+                env.parent.clone()
+            };
+
+            match parent {
+                Some(p) => curr = p,
+                None => return,
+            }
         }
     }
 }

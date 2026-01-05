@@ -36,11 +36,9 @@ impl Repl {
             saw_semicolon = false;
             for c in line.chars() {
                 match c {
-                    '"' => {
-                        in_string = !in_string;
-                    }
+                    '"' => in_string = !in_string,
                     '{' if !in_string => depth += 1,
-                    '}' if !in_string => depth -= 1,
+                    '}' if !in_string && depth > 0 => depth -= 1,
                     ';' if !in_string => saw_semicolon = true,
                     _ => {}
                 }
@@ -52,6 +50,7 @@ impl Repl {
                     depth = 0;
                     saw_semicolon = true;
                     in_string = false;
+                    buff.clear();
                     continue;
                 }
                 saw_empty_line = true;
