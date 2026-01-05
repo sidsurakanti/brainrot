@@ -539,21 +539,21 @@ fn wrong_number_of_args_errors() {
     assert!(matches!(res, Err(LangError::Runtime(_))));
 }
 
-// #[test]
-// fn function_return_basic() -> Result<(), LangError> {
-//     let mut i = Interpreter::new();
-//
-//     i.run(
-//         r#"
-//         fn add(a, b) {
-//             return a + b;
-//         }
-//
-//         let x = add(2, 3);
-//         "#
-//         .into(),
-//     )?;
-//
-//     assert_eq!(i.get("x").unwrap(), Value::Int(5));
-//     Ok(())
-// }
+#[test]
+fn function_return_basic() -> Result<(), LangError> {
+    let mut i = Interpreter::new();
+
+    i.run(
+        r#"
+        fn add(a, b) {
+            return a + b;
+        }
+
+        let x = add(2, 3);
+        "#
+        .into(),
+    )?;
+
+    assert_eq!(i.get("x").unwrap(), Value::Int(5));
+    Ok(())
+}

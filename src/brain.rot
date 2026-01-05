@@ -1,27 +1,5 @@
-fn x(a, b, c) {
-  let d = 4;
-  print(a + b + c + d);
+fn add(a, b) {
+    return a + b;
 }
 
-x(1, 2, 3);
-
-let x = 10;
-
-fn f(a) {
-  print(a + x);
-}
-
-f(5);   // should print 15
-
-let x = 10;
-
-fn f() {
-  let x = 3;
-  fn g() {
-    print(x);
-  }
-  g();
-}
-
-f();   // should print 3
-
+let x = add(2, 3);

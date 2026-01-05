@@ -154,6 +154,7 @@ impl Parser {
                 self.next(); // consume ret
                 if self.peek().kind != TokenType::Semicolon {
                     let expr = self.parse_expr()?;
+                    self.expect(TokenType::Semicolon, "expected ';' after return")?;
                     Stmt::Return(Some(expr))
                 } else {
                     self.expect(TokenType::Semicolon, "expected ';' after return")?;

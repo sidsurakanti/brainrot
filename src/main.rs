@@ -11,7 +11,7 @@ fn main() {
 
     let mut lxr = Lexer::new(src.clone());
     let tokens = lxr.tokenize();
-    // dbg!(tokens);
+    dbg!(&tokens);
 
     let mut parser = Parser::new(tokens);
     let res = parser.parse();

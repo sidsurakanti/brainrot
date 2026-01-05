@@ -217,15 +217,19 @@ impl Interpreter {
                 }
 
                 // eval body
-                self.eval_stmt(body.as_ref())?;
-
+                let res = self.eval_stmt(body.as_ref());
                 // reset back to calling env
                 self.curr_env = calling_env;
+
+                match res {
+                    Ok(cf) => return Ok(cf),
+                    Err(e) => return Err(e),
+                }
             }
             _ => panic!(), // should never get here
         }
 
-        Ok(ControlFlow::None)
+        // Ok(ControlFlow::None)
     }
 
     // ifStmt -> "if" "(" expr ")" block ("elif" block)* ("else" block)?

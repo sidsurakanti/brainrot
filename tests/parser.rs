@@ -167,3 +167,25 @@ fn compound_assignment_desugars_correctly() {
         panic!("compound assignment desugaring broken");
     }
 }
+
+#[test]
+fn parses_return_with_value() {
+    let ast = parse("return 42;");
+    assert!(matches!(ast[0], Stmt::Return(Some(_))));
+}
+
+#[test]
+fn parses_bare_return() {
+    let ast = parse("return;");
+    assert!(matches!(ast[0], Stmt::Return(None)));
+}
+
+#[test]
+fn parses_return_expression_precedence() {
+    let ast = parse("return 1 + 2 * 3;");
+    if let Stmt::Return(Some(Expr::Binary(_, TokenType::Plus, rhs))) = &ast[0] {
+        assert!(matches!(**rhs, Expr::Binary(_, TokenType::Times, _)));
+    } else {
+        panic!("return expression precedence broken");
+    }
+}
