@@ -8,7 +8,7 @@ type EnvRef = Rc<RefCell<Env>>;
 #[derive(Debug)]
 pub struct Env {
     pub(crate) parent: Option<EnvRef>,
-    bucket: HashMap<String, Value>,
+    pub(crate) bucket: HashMap<String, Value>,
 }
 
 impl Env {

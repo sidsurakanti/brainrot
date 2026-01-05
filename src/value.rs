@@ -1,6 +1,10 @@
+use crate::env::Env;
+use crate::parser::Stmt;
+use std::cell::RefCell;
 use std::cmp::{PartialEq, PartialOrd};
 use std::fmt;
 use std::ops::{Add, Div, Mul, Neg, Not, Rem, Sub};
+use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
@@ -9,6 +13,12 @@ pub enum Value {
     Str(String),
     Bool(bool),
     Null,
+    Fn {
+        name: String,
+        args: Vec<String>,
+        body: Box<Stmt>,
+        captured_env: Rc<RefCell<Env>>,
+    },
 }
 
 impl fmt::Display for Value {
@@ -18,6 +28,7 @@ impl fmt::Display for Value {
             Value::Str(s) => write!(f, "{}", s),
             Value::Bool(b) => write!(f, "{}", b),
             Value::Null => write!(f, "null"),
+            Value::Fn { name, .. } => write!(f, "fn<{}>", name),
         }
     }
 }
@@ -73,6 +84,7 @@ impl Not for Value {
             Value::Str(_) | Value::Int(_) => Ok(Value::Bool(self.is_truthy())),
             Value::Bool(val) => Ok(Value::Bool(!val)),
             Value::Null => Err("cannot evaluate not for void".into()),
+            Value::Fn { .. } => Err("cannot evaluate not for fn".into()),
         }
     }
 }
@@ -141,6 +153,7 @@ impl Value {
             Value::Bool(b) => *b,
             Value::Str(s) => !s.is_empty(),
             Value::Null => false,
+            Value::Fn { .. } => false,
         }
     }
 }

@@ -127,15 +127,15 @@ impl Interpreter {
 
             Stmt::Fn { name, args, block } => {
                 // add func to env values
-                // define params
-                // save block and a copy of defining env
-                //
-                // on call
-                // push new env stack
-                // bind args to params
-                // push env copy
-                // return ret value
-                // todo!();
+                let func = Value::Fn {
+                    name: name.clone(),
+                    args: args.clone(),
+                    body: block.clone(),
+                    captured_env: Rc::clone(&self.curr_env),
+                };
+
+                let mut defining_env = self.curr_env.borrow_mut();
+                defining_env.bucket.insert(name.clone(), func);
 
                 Ok(ControlFlow::None)
             }
@@ -165,18 +165,66 @@ impl Interpreter {
     }
 
     fn eval_call(&mut self, name: &String, args: &Vec<Expr>) -> Result<ControlFlow, RuntimeError> {
-        if name.eq("print") {
-            for expr in args {
-                let val = self.eval_expr(expr)?;
+        let vals: Vec<Value> = args
+            .iter()
+            .map(|arg| self.eval_expr(arg))
+            .collect::<Result<Vec<_>, _>>()?;
 
+        // TODO: builtins
+        if name.eq("print") {
+            for val in vals.clone() {
                 match val {
                     Value::Int(_) => println!("{}", val.to_string().cyan()),
                     Value::Str(_) => println!("{}", val.to_string().green()),
                     Value::Bool(_) => println!("{}", val.to_string().yellow()),
                     Value::Null => println!("{}", "null".dimmed()),
+                    Value::Fn { .. } => println!("{}", val),
                 }
             }
+            return Ok(ControlFlow::None);
         }
+
+        let func = self
+            .get(name)
+            .ok_or(format!("function not defined: {}", name))?;
+
+        match func {
+            Value::Fn {
+                name,
+                args,
+                body,
+                captured_env,
+            } => {
+                // attach worker env for fn to it's local env
+                let calling_env = Rc::clone(&self.curr_env);
+                // worker -> captured -> parents
+                self.curr_env = Env::push_scope(&captured_env);
+
+                // push args to working env
+                if !(vals.len() == args.len()) {
+                    return Err(RuntimeError::Message(format!(
+                        "expected {} args got {}",
+                        args.len(),
+                        vals.len()
+                    )));
+                }
+
+                {
+                    let mut working_env = self.curr_env.borrow_mut();
+                    for (arg, val) in args.iter().zip(&vals) {
+                        working_env.bucket.insert(arg.clone(), val.clone());
+                    }
+                }
+
+                // eval body
+                self.eval_stmt(body.as_ref())?;
+
+                // reset back to calling env
+                self.curr_env = calling_env;
+            }
+            _ => panic!(), // should never get here
+        }
+
         Ok(ControlFlow::None)
     }
 
@@ -337,7 +385,7 @@ impl Interpreter {
         loop {
             let parent = {
                 let env = curr.borrow();
-                dbg!(&env);
+                dbg!(env.bucket.keys());
                 env.parent.clone()
             };
 

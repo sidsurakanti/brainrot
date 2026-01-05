@@ -16,7 +16,7 @@ pub enum Stmt {
     },
     Fn {
         name: String,
-        args: Vec<Expr>,
+        args: Vec<String>,
         block: Box<Stmt>,
     },
     If {
@@ -179,25 +179,29 @@ impl Parser {
 
         self.expect(TokenType::LParen, "expected '(' after fn definition")?;
 
-        let mut args: Vec<Expr> = vec![];
+        let mut args: Vec<String> = vec![]; // vec<expr::ident>
 
         if self.check(TokenType::RParen) {
             self.next();
         } else {
             // must be ident
-            if self.check(TokenType::Identifier) {
-                args.push(self.parse_expr()?);
-            } else {
-                return Err("func arg names can only be identifiers".into());
-            }
+            args.push(
+                self.expect(
+                    TokenType::Identifier,
+                    "func arg names can only be identifiers",
+                )?
+                .lexeme,
+            );
 
             while !matches!(self.peek().kind, TokenType::RParen) {
                 self.expect(TokenType::Comma, "expected ',' between args")?;
-                if self.check(TokenType::Identifier) {
-                    args.push(self.parse_expr()?);
-                } else {
-                    return Err("func arg names can only be identifiers".into());
-                }
+                args.push(
+                    self.expect(
+                        TokenType::Identifier,
+                        "func arg names can only be identifiers",
+                    )?
+                    .lexeme,
+                );
             }
 
             self.expect(TokenType::RParen, "expected ')' after args")?;

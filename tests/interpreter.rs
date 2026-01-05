@@ -321,3 +321,239 @@ fn nested_for_loops() -> Result<(), LangError> {
     assert_eq!(i.get("count").unwrap(), Value::Int(6));
     Ok(())
 }
+
+#[test]
+fn closure_captures_outer_var() -> Result<(), LangError> {
+    let mut i = Interpreter::new();
+
+    i.run(
+        r#"
+        let x = 10;
+
+        fn f(a) {
+            print(a + x);
+        }
+
+        f(5);
+        "#
+        .into(),
+    )?;
+
+    Ok(())
+}
+
+#[test]
+fn closure_uses_nearest_scope() -> Result<(), LangError> {
+    let mut i = Interpreter::new();
+
+    i.run(
+        r#"
+        let x = 10;
+
+        fn f() {
+            let x = 3;
+            fn g() {
+                print(x);
+            }
+            g();
+        }
+
+        f();
+        "#
+        .into(),
+    )?;
+
+    Ok(())
+}
+
+#[test]
+fn closure_is_lexical_not_dynamic() -> Result<(), LangError> {
+    let mut i = Interpreter::new();
+
+    i.run(
+        r#"
+        fn f() {
+            print(x);
+        }
+
+        let x = 10;
+        f();
+        "#
+        .into(),
+    )?;
+
+    Ok(())
+}
+
+#[test]
+fn nested_closure_capture() -> Result<(), LangError> {
+    let mut i = Interpreter::new();
+
+    i.run(
+        r#"
+        let x = 1;
+
+        fn outer(a) {
+            let y = 2;
+            fn inner(b) {
+                print(x + a + y + b);
+            }
+            inner(4);
+        }
+
+        outer(3);
+        "#
+        .into(),
+    )?;
+
+    Ok(())
+}
+
+#[test]
+fn function_basic_returnless_call() -> Result<(), LangError> {
+    let mut i = Interpreter::new();
+
+    i.run(
+        r#"
+        fn foo() {
+            let x = 1;
+        }
+
+        foo();
+        "#
+        .into(),
+    )?;
+
+    Ok(())
+}
+
+#[test]
+fn function_with_multiple_params() -> Result<(), LangError> {
+    let mut i = Interpreter::new();
+
+    i.run(
+        r#"
+        fn add(a, b, c) {
+            print(a + b + c);
+        }
+
+        add(1, 2, 3);
+        "#
+        .into(),
+    )?;
+
+    Ok(())
+}
+
+#[test]
+fn function_does_not_leak_locals() -> Result<(), LangError> {
+    let mut i = Interpreter::new();
+
+    i.run(
+        r#"
+        fn foo() {
+            let x = 42;
+        }
+
+        foo();
+        "#
+        .into(),
+    )?;
+
+    assert!(i.get("x").is_none());
+    Ok(())
+}
+
+#[test]
+fn function_can_mutate_outer_var() -> Result<(), LangError> {
+    let mut i = Interpreter::new();
+
+    i.run(
+        r#"
+        let x = 1;
+
+        fn inc() {
+            x = x + 1;
+        }
+
+        inc();
+        inc();
+        "#
+        .into(),
+    )?;
+
+    assert_eq!(i.get("x").unwrap(), Value::Int(3));
+    Ok(())
+}
+
+#[test]
+fn function_shadowing_does_not_affect_outer() -> Result<(), LangError> {
+    let mut i = Interpreter::new();
+
+    i.run(
+        r#"
+        let x = 5;
+
+        fn foo() {
+            let x = 10;
+        }
+
+        foo();
+        "#
+        .into(),
+    )?;
+
+    assert_eq!(i.get("x").unwrap(), Value::Int(5));
+    Ok(())
+}
+
+#[test]
+fn calling_undefined_function_errors() {
+    let mut i = Interpreter::new();
+
+    let res = i.run(
+        r#"
+        foo();
+        "#
+        .into(),
+    );
+
+    assert!(matches!(res, Err(LangError::Runtime(_))));
+}
+
+#[test]
+fn wrong_number_of_args_errors() {
+    let mut i = Interpreter::new();
+
+    let res = i.run(
+        r#"
+        fn foo(a, b) {
+            print(a + b);
+        }
+
+        foo(1);
+        "#
+        .into(),
+    );
+
+    assert!(matches!(res, Err(LangError::Runtime(_))));
+}
+
+// #[test]
+// fn function_return_basic() -> Result<(), LangError> {
+//     let mut i = Interpreter::new();
+//
+//     i.run(
+//         r#"
+//         fn add(a, b) {
+//             return a + b;
+//         }
+//
+//         let x = add(2, 3);
+//         "#
+//         .into(),
+//     )?;
+//
+//     assert_eq!(i.get("x").unwrap(), Value::Int(5));
+//     Ok(())
+// }
