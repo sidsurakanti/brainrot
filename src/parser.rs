@@ -57,6 +57,7 @@ impl Parser {
         Self {
             tokens,
             pos: 0,
+            // pratt power
             lookup: hashmap! {
                 TokenType::Plus => (10, 11),
                 TokenType::Minus => (10, 11),
@@ -65,14 +66,18 @@ impl Parser {
                 TokenType::Modulo => (20, 21),
 
                 TokenType::Assign => (1, 2),
-                TokenType::Bang => (30, 31),
+                TokenType::Bang => (40, 41),
 
-                TokenType::Less => (5, 6),
-                TokenType::Greater => (5, 6),
-                TokenType::EqualEqual => (4, 5),
-                TokenType::NotEqual => (4, 5),
-                TokenType::LessEqual => (5, 6),
-                TokenType::GreaterEqual => (5, 6),
+                TokenType::Less => (6, 7),
+                TokenType::Greater => (6, 7),
+                TokenType::EqualEqual => (5, 6),
+                TokenType::NotEqual => (5, 6),
+                TokenType::LessEqual => (6, 7),
+                TokenType::GreaterEqual => (6, 7),
+
+                TokenType::Or => (3, 4),
+                TokenType::And => (4, 5),
+
             },
         }
     }

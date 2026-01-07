@@ -341,9 +341,28 @@ impl Interpreter {
         match expr {
             Expr::Binary(left, op, right) => {
                 let l = self.eval_expr(left.as_ref())?;
+
+                match op {
+                    TokenType::And => {
+                        if l.logical_not()? {
+                            return Ok(Value::Bool(false));
+                        }
+                        return Ok(Value::Bool(self.eval_expr(right.as_ref())?.is_truthy()));
+                    }
+                    TokenType::Or => {
+                        if l.is_truthy() {
+                            return Ok(Value::Bool(true));
+                        }
+                        return Ok(Value::Bool(self.eval_expr(right)?.is_truthy()));
+                    }
+                    _ => {}
+                };
+
                 let r = self.eval_expr(right.as_ref())?;
 
                 match op {
+                    TokenType::And => Ok(Value::Bool(l.is_truthy() && r.is_truthy())),
+                    TokenType::Or => Ok(Value::Bool(l.is_truthy() || r.is_truthy())),
                     TokenType::Plus => l + r,
                     TokenType::Minus => l - r,
                     TokenType::Times => l * r,

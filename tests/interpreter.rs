@@ -579,3 +579,129 @@ fn recursion_factorial() -> Result<(), LangError> {
     assert_eq!(i.get("x").unwrap(), Value::Int(120));
     Ok(())
 }
+#[test]
+fn logical_and_or_basic() -> Result<(), LangError> {
+    let mut i = Interpreter::new();
+    i.run(
+        r#"
+        let a = true && true;
+        let b = true && false;
+        let c = false || true;
+        let d = false || false;
+        "#
+        .into(),
+    )?;
+
+    assert_eq!(i.get("a").unwrap(), Value::Bool(true));
+    assert_eq!(i.get("b").unwrap(), Value::Bool(false));
+    assert_eq!(i.get("c").unwrap(), Value::Bool(true));
+    assert_eq!(i.get("d").unwrap(), Value::Bool(false));
+    Ok(())
+}
+
+#[test]
+fn logical_precedence_and_over_or() -> Result<(), LangError> {
+    let mut i = Interpreter::new();
+    i.run(
+        r#"
+        let x = true || false && false;
+        let y = (true || false) && false;
+        "#
+        .into(),
+    )?;
+
+    assert_eq!(i.get("x").unwrap(), Value::Bool(true));
+    assert_eq!(i.get("y").unwrap(), Value::Bool(false));
+    Ok(())
+}
+
+#[test]
+fn logical_with_comparisons() -> Result<(), LangError> {
+    let mut i = Interpreter::new();
+    i.run(
+        r#"
+        let a = 5 > 3 && 2 < 4;
+        let b = 5 < 3 || 10 == 10;
+        "#
+        .into(),
+    )?;
+
+    assert_eq!(i.get("a").unwrap(), Value::Bool(true));
+    assert_eq!(i.get("b").unwrap(), Value::Bool(true));
+    Ok(())
+}
+
+#[test]
+fn logical_short_circuit_and() -> Result<(), LangError> {
+    let mut i = Interpreter::new();
+    i.run(
+        r#"
+        let x = 0;
+        false && (x = 1);
+        "#
+        .into(),
+    )?;
+
+    assert_eq!(i.get("x").unwrap(), Value::Int(0));
+    Ok(())
+}
+
+#[test]
+fn logical_short_circuit_or() -> Result<(), LangError> {
+    let mut i = Interpreter::new();
+    i.run(
+        r#"
+        let x = 0;
+        true || (x = 1);
+        "#
+        .into(),
+    )?;
+
+    assert_eq!(i.get("x").unwrap(), Value::Int(0));
+    Ok(())
+}
+
+#[test]
+fn logical_in_if_conditions() -> Result<(), LangError> {
+    let mut i = Interpreter::new();
+    i.run(
+        r#"
+        let x = 0;
+
+        if (x == 0 || x == 1) {
+            x = 5;
+        }
+
+        if (x == 5 && true) {
+            x = 10;
+        }
+        "#
+        .into(),
+    )?;
+
+    assert_eq!(i.get("x").unwrap(), Value::Int(10));
+    Ok(())
+}
+
+#[test]
+fn logical_with_functions_and_side_effects() -> Result<(), LangError> {
+    let mut i = Interpreter::new();
+    i.run(
+        r#"
+        let x = 0;
+
+        fn inc() {
+            x = x + 1;
+            return true;
+        }
+
+        false && inc();
+        true || inc();
+        true && inc();
+        "#
+        .into(),
+    )?;
+
+    assert_eq!(i.get("x").unwrap(), Value::Int(1));
+    Ok(())
+}

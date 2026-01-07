@@ -120,7 +120,18 @@ impl Not for Value {
     fn not(self) -> Self::Output {
         match self {
             Value::Bool(b) => Ok(Value::Bool(!b)),
-            Value::Int(_) | Value::Str(_) => Ok(Value::Bool(self.is_truthy())),
+            Value::Int(_) | Value::Str(_) => Ok(Value::Bool(!self.is_truthy())),
+            Value::Null => Err(RuntimeError::Message("cannot apply '!' to null".into())),
+            Value::Fn { .. } => Err(RuntimeError::Message("cannot apply '!' to function".into())),
+        }
+    }
+}
+
+impl Value {
+    pub fn logical_not(&self) -> Result<bool, RuntimeError> {
+        match self {
+            Value::Bool(b) => Ok(!b),
+            Value::Int(_) | Value::Str(_) => Ok(!self.is_truthy()),
             Value::Null => Err(RuntimeError::Message("cannot apply '!' to null".into())),
             Value::Fn { .. } => Err(RuntimeError::Message("cannot apply '!' to function".into())),
         }
