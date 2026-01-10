@@ -14,7 +14,7 @@ An interpreted language written in Rust. (active development)
 - `while` loops
 - `break`, `continue`, `return`
 - `for` loops 
-- Functions (wip)
+- Functions
 
 ### Usage
 ```zsh
