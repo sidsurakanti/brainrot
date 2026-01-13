@@ -14,7 +14,7 @@ An interpreted language written in Rust. (active development)
 - `while` loops
 - `break`, `continue`, `return`
 - `for` loops 
-- Functions
+- Functions w/ closures and recursion
 
 ### Usage
 ```zsh
@@ -79,4 +79,22 @@ false
 ...
 >>> print(a);
 12
+```
+```rs
+>>> fn add(a, b, c) {
+...   print(a + b + c);
+... }
+...
+>>> add(1, 2, 3);
+6
+```
+```rs
+>>> fn fact(n) {
+...   if (n <= 1) {
+...     return 1;
+...   }
+...   return n * fact(n - 1);
+... }
+... 
+>>> let x = fact(5);
 ```
