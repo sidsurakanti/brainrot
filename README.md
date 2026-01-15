@@ -1,5 +1,5 @@
 # Overview
-An interpreted language written in Rust. (active development)
+An interpreted language written in Rust.
 
 ### Currently supported
 - REPL
